@@ -176,8 +176,10 @@ sub parse_lines {
                 push @buffer, $line;
             }
             else {
-                $result .= $self->_process_buffer(@buffer);
-                @buffer = ();
+                if (@buffer) {
+                    $result .= $self->_process_buffer(@buffer);
+                    @buffer = ();
+                }
             }
         }
         elsif (my $type = $line =~ /^([=+-])/) {
@@ -212,14 +214,175 @@ sub _process_buffer {
         my $para = join " ", @buffer;
         $para =~ s/\s{2,}/ /g;
         $result = $self->_handle_paragraph($para);
+    } 
+    elsif ($buffer_type eq 'verbatim') {
+        $result = $self->_handle_verbatim(join "\n", @buffer);
+    } 
+    elsif ($buffer_type eq 'tag') {
+        $result = $self->_handle_tag(shift @buffer, join " ", @buffer);
+    }
+    elsif ($buffer_type eq 'end') {
+        $result = $self->_handle_end(shift @buffer, join " ", @buffer);
+    }
+    elsif ($buffer_type eq 'begin') {
+        $result = $self->_handle_begin(shift @buffer, join " ", @buffer);
     }
 
     return $result;
 }
 
+sub _handle_verbatim {
+    my ($self, @buffer) = @_;
+
+    my ($indentation) = $buffer[0] =~ /^(\s+)/;
+
+    for (@buffer) {
+        s/^$indentation//;
+    }
+
+    return $self->handle_verbatim(@buffer);
+}
+
+=head2 handle_verbatim
+
+You are given the verbatim paragraph as an array. It has had the leading 
+whitespace removed already. It's not joined into one string yet because you 
+will probably want to know the separate lines.
+
+=cut
+
+sub handle_verbatim {
+    shift;
+    return @_;
+}
+
+# preprocess paragraph before giving it to the user.
 sub _handle_paragraph {
     my ($self, $para) = @_;
+
+    # 1. replace POD-like Z<...> with user-defined functions.
+    # Z itself is the only actual exception to that.
+    my ($match, $remainder, $prefix) 
+        = extract_bracketed $para, "<>", qr/^[^<>]+/;
+
+    while ($match) {
+        my ($open) = $match =~ /^(<+)/;
+        $close = ">" x length $open;
+
+        $match =~ s/$open//; $match =~ s/$close//;
+        $prefix =~ s/(.)$//; $letter = $1;     
+
+        if ($letter eq 'Z') {
+            warn "Z<> should not contain any text" if $match;
+            $match = "";
+            next;
+        }
+
+        my $method = "handle_${letter}_entity";
+
+        warn "Entity not handled: $letter" and next unless $self->can($method);
+        $match = $self->$method($match);
+
+        $para = join "", $prefix, $match, $remainder;
+
+        ($match, $remainder, $prefix) 
+            = extract_bracketed $para, "<>", qr/^[^<>]+/;
+    }
+
+    return $self->handle_paragraph($para);
 }
+
+=head2 handle_paragraph
+
+You get a paragraph, which has had its C<< X<> >> entities handled already.
+Do what you wish, and then return it. It is all on one line.
+
+=cut
+
+sub handle_paragraph {
+    my $self = shift;
+    return shift;
+}
+
+=head2 handle_*
+
+For any tag (C<=foo>) that you intend to handle, create a handle_foo and return
+a string containing the converted text. Your only parameter is everything else
+that appeared after C<=foo> on the line, with whitespace collapsed.
+
+For example, implement C<handle_head1> and return something like
+
+    <h1>DESCRIPTION</h1>
+
+to handle C<=head1 DESCRIPTION> for HTML.
+
+=cut
+
+sub _handle_tag {
+    my ($self, $tag, $content) = @_;
+
+    $content =~ s/\s+/ /g;
+
+    $method = "handle_${tag}";
+    warn "$tag not handled!" and return "" unless $self->can($method);
+
+    return $self->$method($content);
+}
+
+=head2 handle_*_begin
+
+For any begin command (C<+foo>) that you intend to handle, create the 
+corresponding handle_foo_begin method and return relevant markup. Your only
+parameter is everything that appeared after C<+foo> on the line, with whitespace
+collapsed.
+
+=cut
+
+sub _handle_begin {
+    my ($self, $tag, $content) = @_;
+
+    $self->{begin_stack} ||= [];
+
+    # Do this whether or not it is handled, so we can check for balance.
+    push @{$self->{begin_stack}}, $tag;
+
+    my $method = "handle_${tag}_begin";
+    warn "begin-$tag not handled!" and return "" unless $self->can($method);
+
+    return $self->$method($content);
+}
+
+=head2 handle_*_end
+
+The counterpart to the begin handler. This handles your C<-foo> commands. Note
+that if you close a tag that is not opened, or is simply out of order, you will 
+receive a warning and the command will be ignored.
+
+=cut
+
+sub _handle_end {
+    my ($self, $tag, $content) = @_;
+
+    # Do this whether or not it is handled, so we can check for balance.
+    warn "$tag is ended out of sync!" if pop @{$self->{begin_stack}} ne $tag;
+
+    my $method = "handle_${tag}_end";
+    warn "end-$tag not handled!" and return "" unless $self->can($method);
+
+    return $self->$method($content);
+}
+
+=head1 TODO
+
+The only difference between this and POD is that it doesn't have the C<=cut> tag
+to allow it to be inserted into other files. That's because I've developed it as
+a markup language for articles rather than documentation. Shouldn't be hard to 
+implement this, however, so I will get around to it.
+
+I would rather do this in a nested way, since it has nestable commands.
+Currently the matching of begin/end commands is a bit naive.
+
+Line numbers of errors are not yet reported.
 
 =head1 AUTHOR
 
