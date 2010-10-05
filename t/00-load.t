@@ -3,8 +3,8 @@
 use Test::More tests => 1;
 
 BEGIN {
-    use_ok( 'Podcats::Markup' ) || print "Bail out!
+    use_ok( 'Pod::Cats' ) || print "Bail out!
 ";
 }
 
-diag( "Testing Podcats::Markup $Podcats::Markup::VERSION, Perl $], $^X" );
+diag( "Testing Pod::Cats $Podcats::Markup::VERSION, Perl $], $^X" );
