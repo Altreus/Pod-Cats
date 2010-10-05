@@ -2,7 +2,10 @@ package Pod::Cats;
 
 use warnings;
 use strict;
+use 5.010;
 
+use Data::Dumper;
+use Text::Balanced qw(extract_bracketed);
 use Carp;
 
 =head1 NAME
@@ -135,8 +138,10 @@ sub parse_file {
     carp "File not found: " . $filename unless -e $filename;
 
     open my $fh, "<", $filename;
+    chomp(my @lines = <$fh>);
+    close $fh;
 
-    return $self->parse_lines(<$fh>);
+    return $self->parse_lines(@lines);
 }
 
 =head2 parse_lines
@@ -169,29 +174,38 @@ sub parse_lines {
     #    buffer and start a new one with this.
     #  - Anything else continues the previous buffer, or starts a normal paragraph
 
-    for my $line (@lines) {
-        if ($line =~ /^\s*$/) {
+    shift @lines while $lines[0] !~ /\S/; # shift off leading blank lines!
 
+    for my $line (@lines) {
+        if ($line =~ /^\s*$/ && @buffer) {
             if ($buffer[0] eq 'verbatim') {
                 push @buffer, $line;
             }
             else {
-                if (@buffer) {
-                    $result .= $self->_process_buffer(@buffer);
-                    @buffer = ();
-                }
+                $result .= $self->_process_buffer(@buffer);
+                @buffer = ();
             }
         }
-        elsif (my $type = $line =~ /^([=+-])/) {
-            $result .= $self->_process_buffer(@buffer);
+        elsif (my ($type) = $line =~ /^([=+-])/) {
+            if (@buffer) {
+                warn "$type command found without leading blank line.";
+
+                $result .= $self->_process_buffer(@buffer);
+                @buffer = ();
+            }
 
             push @buffer, {
                 '+' => 'begin',
                 '-' => 'end',
                 '=' => 'tag',
-            }->{$type};
+            }->{$type} or die "Don't know what to do with $type";
 
-            @buffer = $line =~ /^$type(.+?)\s(.*)$/
+            push @buffer, grep {$_} ($line =~ /^\Q$type\E(.+)\b(.*)$/);
+        }
+        elsif ($line =~ /^\s+\S/){
+            # TODO: Check leading whitespace is at least the length of the prev.
+            push @buffer, "verbatim" if !@buffer;
+            push @buffer, $line;
         }
         else {
             # Nothing special, continue previous buffer or start a paragraph.
@@ -206,6 +220,8 @@ sub parse_lines {
 # The workhorse, except it's really just a dispatcher.
 sub _process_buffer {
     my ($self, @buffer) = @_;
+
+    return '' unless @buffer;
 
     my $buffer_type = shift @buffer;
     my $result;
@@ -263,14 +279,14 @@ sub _handle_paragraph {
     # 1. replace POD-like Z<...> with user-defined functions.
     # Z itself is the only actual exception to that.
     my ($match, $remainder, $prefix) 
-        = extract_bracketed $para, "<>", qr/^[^<>]+/;
+        = extract_bracketed($para, "<>", qr/^[^<>]+/);
 
     while ($match) {
         my ($open) = $match =~ /^(<+)/;
-        $close = ">" x length $open;
+        my $close = ">" x length $open;
 
         $match =~ s/$open//; $match =~ s/$close//;
-        $prefix =~ s/(.)$//; $letter = $1;     
+        $prefix =~ s/(.)$//; my $letter = $1;     
 
         if ($letter eq 'Z') {
             warn "Z<> should not contain any text" if $match;
@@ -286,7 +302,7 @@ sub _handle_paragraph {
         $para = join "", $prefix, $match, $remainder;
 
         ($match, $remainder, $prefix) 
-            = extract_bracketed $para, "<>", qr/^[^<>]+/;
+            = extract_bracketed($para, "<>", qr/^[^<>]+/);
     }
 
     return $self->handle_paragraph($para);
@@ -323,7 +339,7 @@ sub _handle_tag {
 
     $content =~ s/\s+/ /g;
 
-    $method = "handle_${tag}";
+    my $method = "handle_${tag}";
     warn "$tag not handled!" and return "" unless $self->can($method);
 
     return $self->$method($content);
@@ -347,7 +363,7 @@ sub _handle_begin {
     push @{$self->{begin_stack}}, $tag;
 
     my $method = "handle_${tag}_begin";
-    warn "begin-$tag not handled!" and return "" unless $self->can($method);
+    warn "$method not defined!" and return "" unless $self->can($method);
 
     return $self->$method($content);
 }
@@ -408,4 +424,4 @@ This module is released under the MIT licence.
 
 =cut
 
-"End of Pod::Cats";
+1;
