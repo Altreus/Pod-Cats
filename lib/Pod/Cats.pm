@@ -7,7 +7,7 @@ use Carp;
 
 =head1 NAME
 
-Podcats::Markup - The POD-like markup language written for podcats.in
+Pod::Cats - The POD-like markup language written for podcats.ign
 
 =head1 VERSION
 
@@ -23,12 +23,12 @@ simple also fail to include the power to do complicated things.
 POD uses commands to insert semantic sections, and syntax to do common tasks
 easily.
 
-Podcats::Markup is designed to be extended and doesn't implement any default
+Pod::Cats is designed to be extended and doesn't implement any default
 commands.
 
 =head1 SYNTAX
 
-Podcats::Markup syntax borrows ideas from POD and adds its own.
+Pod::Cats syntax borrows ideas from POD and adds its own.
 
 =over
     
@@ -113,7 +113,7 @@ sub new {
 
 =head2 parse
 
-Parses a string containing whatever Podcats::Markup code you have.
+Parses a string containing whatever Pod::Cats code you have.
 
 =cut
 
@@ -390,7 +390,7 @@ Altreus, C<< <altreus at perl.org> >>
 
 =head1 BUGS
 
-Bug reports to github please: http://github.com/Altreus/Podcats-Markup/issues
+Bug reports to github please: http://github.com/Altreus/Pod-Cats/issues
 
 =head1 SUPPORT
 

@@ -7,4 +7,4 @@ BEGIN {
 ";
 }
 
-diag( "Testing Pod::Cats $Podcats::Markup::VERSION, Perl $], $^X" );
+diag( "Testing Pod::Cats $Pod::Cats::VERSION, Perl $], $^X" );
