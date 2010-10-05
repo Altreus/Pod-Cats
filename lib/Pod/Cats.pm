@@ -210,25 +210,25 @@ sub _process_buffer {
     my $buffer_type = shift @buffer;
     my $result;
 
-    if ($buffer_type eq 'paragraph') {
-        my $para = join " ", @buffer;
-        $para =~ s/\s{2,}/ /g;
-        $result = $self->_handle_paragraph($para);
-    } 
-    elsif ($buffer_type eq 'verbatim') {
-        $result = $self->_handle_verbatim(join "\n", @buffer);
-    } 
-    elsif ($buffer_type eq 'tag') {
-        $result = $self->_handle_tag(shift @buffer, join " ", @buffer);
-    }
-    elsif ($buffer_type eq 'end') {
-        $result = $self->_handle_end(shift @buffer, join " ", @buffer);
-    }
-    elsif ($buffer_type eq 'begin') {
-        $result = $self->_handle_begin(shift @buffer, join " ", @buffer);
-    }
-
-    return $result;
+    return {
+        paragraph => sub {
+            my $para = join " ", @buffer;
+            $para =~ s/\s{2,}/ /g;
+            $self->_handle_paragraph($para);
+        },
+        verbatim => sub {
+            $self->_handle_verbatim(join "\n", @buffer);
+        },
+        tag      => sub {
+            $self->_handle_tag(shift @buffer, join " ", @buffer);
+        },
+        end      => sub {
+            $self->_handle_end(shift @buffer, join " ", @buffer);
+        },
+        begin    => sub {
+            $self->_handle_begin(shift @buffer, join " ", @buffer);
+        }
+    }->{$buffer_type}->();
 }
 
 sub _handle_verbatim {
@@ -280,8 +280,8 @@ sub _handle_paragraph {
 
         my $method = "handle_${letter}_entity";
 
-        warn "Entity not handled: $letter" and next unless $self->can($method);
-        $match = $self->$method($match);
+        warn "Entity not handled: $letter" and next unless my $m = $self->can($method);
+        $match = $self->$m($match);
 
         $para = join "", $prefix, $match, $remainder;
 
@@ -408,4 +408,4 @@ This module is released under the MIT licence.
 
 =cut
 
-"End of Podcats::Markup";
+"End of Pod::Cats";
