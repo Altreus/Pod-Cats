@@ -25,6 +25,8 @@ sub handle_intro_begin {
 sub handle_paragraph {
     my $self = shift;
 
+    ok(1, 'handed to handle_paragraph');
+
     $self->{i} //= 0;
     if ($self->{i} == 0) {
         is(shift, 
@@ -38,11 +40,20 @@ sub handle_paragraph {
     }
 }
 
+sub handle_head1 {
+    my $self = shift;
+    ok(1, 'head1 dispatched to handle_head1');
+    is(shift, 'TEST POD::CATS',
+        'Content of head1 is OK');
+}
+
 1;
 
 package main;
 
 __DATA__
+=head1 TEST POD::CATS
+
 +intro
 Since there is no blank line, this is part of the begin command.
 
