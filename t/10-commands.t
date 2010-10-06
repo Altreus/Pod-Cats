@@ -16,7 +16,7 @@ use parent 'Pod::Cats';
 
 sub handle_intro_begin {
     my $self = shift;
-    ok(1, '+intro dispatched to handle_intro_begin');
+    pass('+intro dispatched to handle_intro_begin');
     is_deeply($self->{begin_stack}, ['intro'], 'begin stack looks OK');
     is(shift, 'Since there is no blank line, this is part of the begin command.', 
         'Content of intro begin is OK');
@@ -25,7 +25,7 @@ sub handle_intro_begin {
 sub handle_paragraph {
     my $self = shift;
 
-    ok(1, 'handed to handle_paragraph');
+    pass('handed to handle_paragraph');
 
     $self->{i} //= 0;
     if ($self->{i} == 0) {
@@ -42,7 +42,7 @@ sub handle_paragraph {
 
 sub handle_head1 {
     my $self = shift;
-    ok(1, 'head1 dispatched to handle_head1');
+    pass('head1 dispatched to handle_head1');
     is(shift, 'TEST POD::CATS',
         'Content of head1 is OK');
 }
