@@ -14,12 +14,24 @@ use Test::More 'no_plan';
 
 use parent 'Pod::Cats';
 
-sub handle_intro_begin {
+sub handle_begin {
     my $self = shift;
-    pass('+intro dispatched to handle_intro_begin');
+    
+    fail('this is not +intro!') and return unless shift eq 'intro';
+
+    pass('+intro dispatched to handle_begin');
     is_deeply($self->{begin_stack}, ['intro'], 'begin stack looks OK');
     is(shift, 'Since there is no blank line, this is part of the begin command.', 
         'Content of intro begin is OK');
+}
+
+sub handle_end {
+    my $self = shift;
+    
+    fail('this is not -intro!') and return unless shift eq 'intro';
+
+    pass('-intro dispatched to handle_end');
+    is_deeply($self->{begin_stack}, [], 'begin stack looks OK');
 }
 
 sub handle_paragraph {
@@ -40,9 +52,12 @@ sub handle_paragraph {
     }
 }
 
-sub handle_head1 {
+sub handle_tag {
     my $self = shift;
-    pass('head1 dispatched to handle_head1');
+    
+    fail('this is not =head1!') and return unless shift eq 'head1';
+
+    pass('head1 dispatched to handle_tag');
     is(shift, 'TEST POD::CATS',
         'Content of head1 is OK');
 }

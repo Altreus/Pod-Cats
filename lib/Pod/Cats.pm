@@ -274,6 +274,22 @@ sub handle_verbatim {
     return @_;
 }
 
+=head2 handle_entity
+
+For any entity (C<< Z<> >>) encountered, its letter is provided to the
+handle_entity method, along with the contents inside it.
+
+Entites are recognised by their C<< < > >>. As long as they balance, you can use
+any number of them to surround the content of the entity. This allows you to use
+these characters themselves in the content.
+
+The C<< Z<> >> entity is special. This is not passed off to this handler. The
+C<< Z<> >> entity allows you to do something like C<< CZ<><> >> in order to
+"escape" the entity from being recognised. In short, it does nothing except be
+there in the source.
+
+=cut
+
 # preprocess paragraph before giving it to the user.
 sub _handle_paragraph {
     my ($self, $para) = @_;
@@ -296,15 +312,8 @@ sub _handle_paragraph {
             next;
         }
 
-        my $method = "handle_${letter}_entity";
-
         # $match is now just the content of the element.
-        if (my $m = $self->can($method)) {
-            $match = $self->$m($match);
-        }
-        else {
-            warn "Entity $letter not handled!";
-        }
+        $match = $self->handle_entity($letter, $match);
 
         $para = join "", $prefix, $match, $remainder;
 
@@ -327,17 +336,10 @@ sub handle_paragraph {
     return shift;
 }
 
-=head2 handle_*
+=head2 handle_tag
 
-For any tag (C<=foo>) that you intend to handle, create a handle_foo and return
-a string containing the converted text. Your only parameter is everything else
-that appeared after C<=foo> on the line, with whitespace collapsed.
-
-For example, implement C<handle_head1> and return something like
-
-    <h1>DESCRIPTION</h1>
-
-to handle C<=head1 DESCRIPTION> for HTML.
+For each tag (C<=foo>) encountered, it is passed to C<handle_tag> along with the
+content of the tag with its whitespace collapsed. Do with it as you will.
 
 =cut
 
@@ -346,18 +348,14 @@ sub _handle_tag {
 
     $content =~ s/\s+/ /g;
 
-    my $method = "handle_${tag}";
-    warn "$tag not handled!" and return "" unless $self->can($method);
-
-    return $self->$method($content);
+    return $self->handle_tag($tag, $content);
 }
 
-=head2 handle_*_begin
+=head2 handle_begin
 
-For any begin command (C<+foo>) that you intend to handle, create the 
-corresponding handle_foo_begin method and return relevant markup. Your only
-parameter is everything that appeared after C<+foo> on the line, with whitespace
-collapsed.
+When a begin command (C<+foo>) is encountered, it is passed to this function for
+processing. The first argument (after C<$self>) will be the tag name ("foo");
+the second will be the content of the command with the whitespace collapsed.
 
 =cut
 
@@ -369,17 +367,15 @@ sub _handle_begin {
     # Do this whether or not it is handled, so we can check for balance.
     push @{$self->{begin_stack}}, $tag;
 
-    my $method = "handle_${tag}_begin";
-    warn "$method not defined!" and return "" unless $self->can($method);
-
-    return $self->$method($content);
+    return $self->handle_begin($tag, $content);
 }
 
-=head2 handle_*_end
+=head2 handle_end
 
 The counterpart to the begin handler. This handles your C<-foo> commands. Note
 that if you close a tag that is not opened, or is simply out of order, you will 
-receive a warning and the command will be ignored.
+receive a warning and the command will be ignored. The handler is passed the tag
+name; end tags accept no content.
 
 =cut
 
@@ -389,10 +385,7 @@ sub _handle_end {
     # Do this whether or not it is handled, so we can check for balance.
     warn "$tag is ended out of sync!" if pop @{$self->{begin_stack}} ne $tag;
 
-    my $method = "handle_${tag}_end";
-    warn "end-$tag not handled!" and return "" unless $self->can($method);
-
-    return $self->$method($content);
+    return $self->handle_end($tag, $content);
 }
 
 =head1 TODO

@@ -14,23 +14,26 @@ use Test::More 'no_plan';
 
 use parent 'Pod::Cats';
 
-sub handle_I_entity {
+sub handle_entity {
     my $self = shift;
+    
+    my $entity = shift;
     my $content = shift;
-    is($content, 'simple', 'I entity contains "simple"' );
+
+    if ( $entity eq 'I' ) {
+        is($content, 'simple', 'I entity contains "simple"' );
+    }
+    elsif ($entity eq 'C') {
+        is( $content, 'Z<>', 'C entity contains Z<>' );
+    }
+    elsif ($entity eq 'Z') {
+        fail('Z entity should not be passed off for user handling');
+    }
+    else {
+        fail('this is not I<>!') and return unless shift eq 'I';
+    }
 
     return $content;
-}
-
-sub handle_C_entity {
-    my $self = shift;
-    my $content = shift;
-    
-    is( $content, 'Z<>', 'C entity contains Z<>' );
-}
-
-sub handle_Z_entity {
-    fail('Z entity should not be passed off for user handling');
 }
 
 1;
