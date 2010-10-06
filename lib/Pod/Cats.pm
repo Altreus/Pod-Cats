@@ -200,7 +200,7 @@ sub parse_lines {
                 '=' => 'tag',
             }->{$type} or die "Don't know what to do with $type";
 
-            push @buffer, grep {$_} ($line =~ /^\Q$type\E(.+)\b(.*)$/);
+            push @buffer, grep {$_} ($line =~ /^\Q$type\E(.+?)\b\s*(.*)$/);
         }
         elsif ($line =~ /^\s+\S/){
             # TODO: Check leading whitespace is at least the length of the prev.
