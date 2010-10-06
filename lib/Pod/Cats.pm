@@ -214,6 +214,8 @@ sub parse_lines {
         }
     }
 
+    $result .= $self->_process_buffer(@buffer) if @buffer;
+
     return $result;
 }
 
@@ -296,8 +298,13 @@ sub _handle_paragraph {
 
         my $method = "handle_${letter}_entity";
 
-        warn "Entity not handled: $letter" and next unless my $m = $self->can($method);
-        $match = $self->$m($match);
+        # $match is now just the content of the element.
+        if (my $m = $self->can($method)) {
+            $match = $self->$m($match);
+        }
+        else {
+            warn "Entity $letter not handled!";
+        }
 
         $para = join "", $prefix, $match, $remainder;
 
