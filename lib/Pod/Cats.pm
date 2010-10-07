@@ -94,6 +94,8 @@ A useful trick to note is that you can separate verbatim paragraphs by putting
 a C<< Z<> >> on its own on a line with I<no> whitespace, basically in order to
 create an empty normal paragraph between the two verbatim paragraphs.
 
+=back
+
 =head1 METHODS
 
 =cut
