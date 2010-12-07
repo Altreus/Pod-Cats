@@ -7,7 +7,7 @@ use Parse::RecDescent;
 use Data::Dumper;
 
 $::RD_TRACE = 1;
-
+$::RD_HINT = 1;
 undef $Parse::RecDescent::skip;
 
 my $grammar = <<'EOGRAMMAR';
@@ -25,7 +25,7 @@ document:
     section(s)
 
 section: 
-    begin_para section(s) end_para
+    begin_para section(s) end_para { $return = $item[1] }
   | command_para
   | verbatim_para(s) { $indent = 0; $return = $item[1]; }
   | text_para
@@ -83,33 +83,39 @@ text_para:
     }
 
 entity_begin:
-    LETTER OPENING_DELIMITER 
+    OPENING_DELIMITER 
     { 
-        push @entity_scope, $item[1];
+        my $letter = substr $item[1], 0, 1, '';
+
+        push @entity_scope, $letter;
+        $item[1];
         1;
     }
 
 entity_end:
-    CLOSING_DELIMITER
+    <reject: !$cd> <commit>
+  | CLOSING_DELIMITER
   | <error: could not find matching closing delimiter $item[1]>
 
 entity:
-    entity_begin text entity_end[$item[1]]
+    entity_begin text entity_end
     {
-        +{
+        $return = {
             type => 'entity',
             entity => pop @entity_scope,
             text => join '', @{$item[2]},
         };
     }
 
-text:
-    entity
-  | WORD(s) ...!entity { $return = join '', @{$item[1]} }
+# So text either starts with an entity, is everything up to the current closing
+# delimiter, or is everything up to the next entity
+text: <rulevar: local $stop_greedy_words>
+  | entity
+  | WORD(s) { $return = join '', @{$item[1]} }
 
 OPENING_DELIMITER:
-    <reject: !$od> "$od" <commit> { $cd = $od; $cd =~ tr/{[<(/}]>)/ }
-  | /([\Q$delimiters\E])\1*/ { $od = $item[1] }
+    <reject: !$od> "$od" <commit> { $return = $item[1]; }
+  | /\S([\[{(<])\1*/ { $return = $cd = $od = $item[1]; $cd =~ tr/{[<(/}]>)/; }
 
 CLOSING_DELIMITER:
     "$cd"
@@ -117,8 +123,19 @@ CLOSING_DELIMITER:
 LETTER:
     /[[:alpha:]]/
 
+# consume everthing up to the start of the next word, or a newline. If the
+# closing delimiter is found in our word, don't consume it.
 WORD:
-    /\S[^\Q$delimiters\E]+?\s?/ { ( $return = $item[1] ) =~ tr/\n/ /; }
+    <reject:$stop_greedy_words>
+    /(\S+\s?)/ {
+        $return = $1;
+        $return =~ s/\n/ /;
+        if ($cd && (my $idx = index $return, $cd) > -1) {
+            $return = substr $return, 0, $idx;
+            $stop_greedy_words = 1;
+        }
+        1;
+    }
 
 RAWTEXT:
     /.+?\n/
