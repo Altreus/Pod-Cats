@@ -5,7 +5,8 @@ use strict;
 use 5.010;
 
 use Data::Dumper;
-use Text::Balanced qw(extract_bracketed);
+use Parser::MGC;
+use List::Utils qw(min);
 use Carp;
 
 =head1 NAME
@@ -157,21 +158,16 @@ slurp or a split /\n/ and parses it. This is where the logic happens.
 sub parse_lines {
     my ($self, @lines) = @_;
 
-    # TODO: Currently this is being built piecemeal, which allows for mistakes
-    # such as imbalanced tags. A better solution would be to build an object
-    # model out of it, and process this depth-first, to make a consistent
-    # output. this will still always rely on the user's begin/end handlers 
-    # producing balanced tags but that's up to them.
-
     my $result = "";
 
     # The buffer type goes in the first element, and its
     # contents, if any, in the rest.
     my @buffer;
+    $self->{dom} = [];
 
     # Special lines are:
-    #  - a blank line except when in a verbatim paragraph. Process the buffer
-    #    and start a new one.
+    #  - a blank line. An exception is between verbatim paragraphs, so we will
+    #    simply re-merge verbatim paras later on
     #  - A line starting with =, + or -. Command paragraph. Process the previous
     #    buffer and start a new one with this.
     #  - Anything else continues the previous buffer, or starts a normal paragraph
@@ -179,88 +175,151 @@ sub parse_lines {
     shift @lines while $lines[0] !~ /\S/; # shift off leading blank lines!
 
     for my $line (@lines) {
-        if ($line =~ /^\s*$/ && @buffer) {
-            if ($buffer[0] eq 'verbatim') {
+        given ($line) {
+            when (/^\s*$/) {
+                $self->_process_buffer(@buffer);
+                @buffer = ();
+            }
+            when (/^([=+-])/) {
+                my $type = $1;
+                if (@buffer) {
+                    warn "$type command found without leading blank line.";
+
+                    $self->_process_buffer(@buffer);
+                    @buffer = ();
+                }
+
+                push @buffer, {
+                    '+' => 'begin',
+                    '-' => 'end',
+                    '=' => 'tag',
+                }->{$type} or die "Don't know what to do with $type";
+
+                # find and push the command name onto it; the rest is the first
+                # bit of buffer contents.
+                push @buffer, grep {$_} ($line =~ /^\Q$type\E(.+?)\b\s*(.*)$/);
+            }
+            when (/^\s+\S/) {
+                push @buffer, "verbatim" if !@buffer;
                 push @buffer, $line;
             }
-            else {
-                $result .= $self->_process_buffer(@buffer);
-                @buffer = ();
+            default {
+                # Nothing special, continue previous buffer or start a paragraph.
+                push @buffer, "paragraph" if !@buffer;
+                push @buffer, $line;
             }
-        }
-        elsif (my ($type) = $line =~ /^([=+-])/) {
-            if (@buffer) {
-                warn "$type command found without leading blank line.";
-
-                $result .= $self->_process_buffer(@buffer);
-                @buffer = ();
-            }
-
-            push @buffer, {
-                '+' => 'begin',
-                '-' => 'end',
-                '=' => 'tag',
-            }->{$type} or die "Don't know what to do with $type";
-
-            push @buffer, grep {$_} ($line =~ /^\Q$type\E(.+?)\b\s*(.*)$/);
-        }
-        elsif ($line =~ /^\s+\S/){
-            # TODO: Check leading whitespace is at least the length of the prev.
-            push @buffer, "verbatim" if !@buffer;
-            push @buffer, $line;
-        }
-        else {
-            # Nothing special, continue previous buffer or start a paragraph.
-            push @buffer, "paragraph" if !@buffer;
-            push @buffer, $line;
         }
     }
 
-    $result .= $self->_process_buffer(@buffer) if @buffer;
+    $self->_process_buffer(@buffer) if @buffer;
+    $self->_postprocess_dom();
 
-    return $result;
+    $self->_postprocess_paragraphs();
+    return $self->{dom};
 }
 
-# The workhorse, except it's really just a dispatcher.
+# Adds the buffer and some metadata to the DOM, returning nothing.
 sub _process_buffer {
     my ($self, @buffer) = @_;
 
     return '' unless @buffer;
 
     my $buffer_type = shift @buffer;
-    my $result;
+    
+    my $node = {
+        type => $buffer_type;
+    };
 
-    return {
-        paragraph => sub {
+    given ($buffer_type) {
+        when('paragraph') {
+            # concatenate the lines and normalise whitespace.
             my $para = join " ", @buffer;
-            $para =~ s/\s{2,}/ /g;
-            $self->_handle_paragraph($para);
-        },
-        verbatim => sub {
-            $self->_handle_verbatim(join "\n", @buffer);
-        },
-        tag      => sub {
-            $self->_handle_tag(shift @buffer, join " ", @buffer);
-        },
-        end      => sub {
-            $self->_handle_end(shift @buffer, join " ", @buffer);
-        },
-        begin    => sub {
-            $self->_handle_begin(shift @buffer, join " ", @buffer);
+            $para =~ s/(\s){2,}/$1/g;
+            $node->{content} = $para;
         }
-    }->{$buffer_type}->();
-}
-
-sub _handle_verbatim {
-    my ($self, @buffer) = @_;
-
-    my ($indentation) = $buffer[0] =~ /^(\s+)/;
-
-    for (@buffer) {
-        s/^$indentation//;
+        when('verbatim') {
+            # find the lowest level of indentation in this buffer and strip it
+            my $indent_level = min { /^(\s+)/; length $1 } @buffer;
+            s/^\s{$indent_level}// for @buffer;
+            $node->{content} = join "\n", @buffer;
+            $node->{indent_level} = $indent_level;
+        }
+        when('tag' || 'begin') {
+            $node->{name} = shift @buffer;
+            my $content = join " ", @buffer;
+            $content =~ s/(\s){2,}/$1/g;
+            $node->{content} = $content;
+        }
+        when('end') {
+            $node->{name} = shift @buffer; # end tags take no content
+        }
     }
 
-    return $self->handle_verbatim(@buffer);
+    push @{$self->{dom}}, $node;
+}
+
+# This is basically just to merge verbatims together
+sub _postprocess_dom {
+    my $self = shift;
+
+    my @new_dom;
+    my $last_node;
+    for my $node (@{$self->{dom}}) {
+        $last_node = $node and next unless defined $last_node;
+
+        # Don't change the last node until we stop finding verbatims.
+        # That way we can keep using it as the concatenated node.
+        if ($last_node->{type} eq 'verbatim' && $node->{type} eq 'verbatim') {
+            my $to_remove = 
+                max( $last_node->{indent_level}, $node->{indent_level})
+              - min( $last_node->{indent_level}, $node->{indent_level});
+            $last_node->{content} .= "\n" . $node->{content};
+
+            # If the min indent has gone down, raze more spaces off.
+            $last_node->{content} =~ s/^\s{$to_remove}//mg if $to_remove;
+        } else {
+            # Node type changed, push old one
+            push @new_dom, $last_node;
+            $last_node = $node;
+        }
+    }
+
+    push @new_dom, $last_node;
+}
+
+# Now is the sax-like bit, where it goes through and fires the user's events for
+# the various types.
+sub _postprocess_paragraphs {
+    my $self = shift;
+
+    for my $node ($self->{dom}) {
+        given ($node->{type}) {
+            when ('paragraph') {
+                $node->{content} = $self->_process_entities($node->{content});
+                $self->handle_paragraph($node->{content});
+            }
+            when ('begin') {
+                $node->{content} = $self->_process_entities($node->{content});
+                # Check for balance later
+                push @{$self->{begin_stack}}, $node->{name};
+
+                $self->handle_begin($node->{name}, $node->{content});
+            }
+            when ('end') {
+                warn "$node->{name} is ended out of sync!" 
+                    if pop @{$self->{begin_stack}} ne $node->{name}
+
+                $self->handle_end($node->{name});
+            }
+            when ('command') {
+                $node->{content} = $self->_process_entities($node->{content});
+                $self->handle_command($node->{name}, $node->{content});
+            }
+            when ('verbatim') {
+                $self->handle_verbatim($node->{content});
+            }
+        }
+    }
 }
 
 =head2 handle_verbatim
@@ -293,35 +352,13 @@ there in the source.
 =cut
 
 # preprocess paragraph before giving it to the user.
-sub _handle_paragraph {
+sub _process_entities {
     my ($self, $para) = @_;
 
     # 1. replace POD-like Z<...> with user-defined functions.
     # Z itself is the only actual exception to that.
-    my ($match, $remainder, $prefix) 
-        = extract_bracketed($para, "<>", qr/^[^<>]+/);
+    $self->{parser} ||= Pod::Cats::Parser::MGC->new();
 
-    while ($match) {
-        my ($open) = $match =~ /^(<+)/;
-        my $close = ">" x length $open;
-
-        $match =~ s/$open//; $match =~ s/$close//;
-        $prefix =~ s/(.)$//; my $letter = $1;     
-
-        if ($letter eq 'Z') {
-            warn "Z<> should not contain any text" if $match;
-            $match = "";
-            next;
-        }
-
-        # $match is now just the content of the element.
-        $match = $self->handle_entity($letter, $match);
-
-        $para = join "", $prefix, $match, $remainder;
-
-        ($match, $remainder, $prefix) 
-            = extract_bracketed($para, "<>", qr/^[^<>]+/);
-    }
 
     return $self->handle_paragraph($para);
 }
@@ -334,8 +371,7 @@ Do what you wish, and then return it. It is all on one line.
 =cut
 
 sub handle_paragraph {
-    my $self = shift;
-    return shift;
+    shift; shift;
 }
 
 =head2 handle_tag
@@ -345,12 +381,8 @@ content of the tag with its whitespace collapsed. Do with it as you will.
 
 =cut
 
-sub _handle_tag {
-    my ($self, $tag, $content) = @_;
-
-    $content =~ s/\s+/ /g;
-
-    return $self->handle_tag($tag, $content);
+sub handle_tag {
+    shift; shift;
 }
 
 =head2 handle_begin
@@ -362,14 +394,7 @@ the second will be the content of the command with the whitespace collapsed.
 =cut
 
 sub _handle_begin {
-    my ($self, $tag, $content) = @_;
-
-    $self->{begin_stack} ||= [];
-
-    # Do this whether or not it is handled, so we can check for balance.
-    push @{$self->{begin_stack}}, $tag;
-
-    return $self->handle_begin($tag, $content);
+    shift; shift; shift;
 }
 
 =head2 handle_end
@@ -381,13 +406,8 @@ name; end tags accept no content.
 
 =cut
 
-sub _handle_end {
-    my ($self, $tag, $content) = @_;
-
-    # Do this whether or not it is handled, so we can check for balance.
-    warn "$tag is ended out of sync!" if pop @{$self->{begin_stack}} ne $tag;
-
-    return $self->handle_end($tag, $content);
+sub handle_end {
+    shift; shift; shift;
 }
 
 =head1 TODO
