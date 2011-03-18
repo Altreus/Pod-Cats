@@ -1,5 +1,4 @@
-The format of POD is kept, largely, but the things that do things no longer do
-the things they do. That is, C<=head1> is no longer a header; C[C<>] is no
+That is, C<=head1> is no longer a header; C[C<>] is no
 longer code. The only exception is that C[Z<>] remains a no-op, divider entity.
 
 Now, all entities of the format C<letter> C[<] C[>] are considered arbitrary

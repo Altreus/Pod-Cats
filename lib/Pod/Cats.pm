@@ -5,8 +5,8 @@ use strict;
 use 5.010;
 
 use Data::Dumper;
-use Parser::MGC;
-use List::Utils qw(min);
+use Pod::Cats::Parser::MGC;
+use List::Util qw(min);
 use Carp;
 
 =head1 NAME
@@ -192,7 +192,7 @@ sub parse_lines {
                 push @buffer, {
                     '+' => 'begin',
                     '-' => 'end',
-                    '=' => 'tag',
+                    '=' => 'command',
                 }->{$type} or die "Don't know what to do with $type";
 
                 # find and push the command name onto it; the rest is the first
@@ -227,27 +227,25 @@ sub _process_buffer {
     my $buffer_type = shift @buffer;
     
     my $node = {
-        type => $buffer_type;
+        type => $buffer_type
     };
 
     given ($buffer_type) {
         when('paragraph') {
             # concatenate the lines and normalise whitespace.
             my $para = join " ", @buffer;
-            $para =~ s/(\s){2,}/$1/g;
             $node->{content} = $para;
         }
         when('verbatim') {
             # find the lowest level of indentation in this buffer and strip it
-            my $indent_level = min { /^(\s+)/; length $1 } @buffer;
+            my $indent_level = min_by { /^(\s+)/; length $1 } @buffer;
             s/^\s{$indent_level}// for @buffer;
             $node->{content} = join "\n", @buffer;
             $node->{indent_level} = $indent_level;
         }
-        when('tag' || 'begin') {
+        when($_ eq 'command' || $_ eq 'begin') {
             $node->{name} = shift @buffer;
             my $content = join " ", @buffer;
-            $content =~ s/(\s){2,}/$1/g;
             $node->{content} = $content;
         }
         when('end') {
@@ -292,7 +290,7 @@ sub _postprocess_dom {
 sub _postprocess_paragraphs {
     my $self = shift;
 
-    for my $node ($self->{dom}) {
+    for my $node (@{ $self->{dom} }) {
         given ($node->{type}) {
             when ('paragraph') {
                 $node->{content} = $self->_process_entities($node->{content});
@@ -307,7 +305,7 @@ sub _postprocess_paragraphs {
             }
             when ('end') {
                 warn "$node->{name} is ended out of sync!" 
-                    if pop @{$self->{begin_stack}} ne $node->{name}
+                    if pop @{$self->{begin_stack}} ne $node->{name};
 
                 $self->handle_end($node->{name});
             }
@@ -357,10 +355,15 @@ sub _process_entities {
 
     # 1. replace POD-like Z<...> with user-defined functions.
     # Z itself is the only actual exception to that.
-    $self->{parser} ||= Pod::Cats::Parser::MGC->new();
+    $self->{parser} ||= Pod::Cats::Parser::MGC->new(
+        object => $self,
+        delimiters => $self->{delimiters} // '<'
+    );
 
+    my $parsed = $self->{parser}->from_string( $para );
+    $parsed = $parsed->[0]; 
 
-    return $self->handle_paragraph($para);
+    return $parsed;
 }
 
 =head2 handle_paragraph
@@ -374,14 +377,14 @@ sub handle_paragraph {
     shift; shift;
 }
 
-=head2 handle_tag
+=head2 handle_command
 
-For each tag (C<=foo>) encountered, it is passed to C<handle_tag> along with the
-content of the tag with its whitespace collapsed. Do with it as you will.
+For each command (C<=foo>) encountered, it is passed to C<handle_command>.
+Do stuff with it and return a scalar of any type.
 
 =cut
 
-sub handle_tag {
+sub handle_command {
     shift; shift;
 }
 

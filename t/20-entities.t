@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use Data::Dumper;
 
 my $pc = Pod::Cats::Test->new();
 chomp(my @lines = <DATA>);
@@ -24,7 +25,7 @@ sub handle_entity {
         is($content, 'simple', 'I entity contains "simple"' );
     }
     elsif ($entity eq 'C') {
-        is( $content, 'Z<>', 'C entity contains Z<>' );
+        is( $content, '', 'C entity contains nothing because Z<> is always empty.' );
     }
     elsif ($entity eq 'Z') {
         fail('Z entity should not be passed off for user handling');

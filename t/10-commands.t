@@ -2,10 +2,11 @@
 
 use strict;
 use warnings;
+use Data::Dumper;
 
 my $pc = Pod::Cats::Test->new();
 chomp(my @lines = <DATA>);
-$pc->parse_lines(@lines);
+print Dumper $pc->parse_lines(@lines);
 
 package Pod::Cats::Test;
 
@@ -13,6 +14,14 @@ use Data::Dumper;
 use Test::More 'no_plan';
 
 use parent 'Pod::Cats';
+
+my @expected_order = qw(
+    command
+    begin
+    paragraph
+    paragraph
+    end
+);
 
 sub handle_begin {
     my $self = shift;
@@ -50,14 +59,15 @@ sub handle_paragraph {
         is(shift, 'This is a second paragraph. The blank line is what determines that.',
         'Got second paragraph');
     }
+    return join ' ', @_;
 }
 
-sub handle_tag {
+sub handle_command {
     my $self = shift;
     
     fail('this is not =head1!') and return unless shift eq 'head1';
 
-    pass('head1 dispatched to handle_tag');
+    pass('head1 dispatched to handle_command');
     is(shift, 'TEST POD::CATS',
         'Content of head1 is OK');
 }
