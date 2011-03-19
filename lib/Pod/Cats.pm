@@ -11,89 +11,131 @@ use Carp;
 
 =head1 NAME
 
-Pod::Cats - The POD-like markup language written for podcats.ign
+Pod::Cats - The POD-like markup language written for podcats.in
 
 =head1 VERSION
 
-Version 0.01
+Version 0.02
 
 =head1 DESCRIPTION
 
-There's a sad lack of decent markup languages. Those that give you the power
-to do arbitrary or strange things also are so bloated or complex that you might
-as well just write out your HTML and parse that. Those that make simple things
-simple also fail to include the power to do complicated things.
-
-POD uses commands to insert semantic sections, and syntax to do common tasks
-easily.
+POD is an expressive markup language - like Perl is an expressive programming
+language - and for a plain text file format there is little finer. Pod::Cats is
+an extension of the POD semantics that adds more syntax and more flexibility to
+the language.
 
 Pod::Cats is designed to be extended and doesn't implement any default
-commands.
+commands or entities.
 
 =head1 SYNTAX
 
 Pod::Cats syntax borrows ideas from POD and adds its own.
 
+A paragraph is any block of text delimited by blank lines (whitespace ignored).
+This is the same as POD, and basically allows you to use hard word wrapping in
+your markup without having to join them all together for output later.
+
+There are three command paragraphs, which are defined by their first character.
+This character must be in the first column; whitespace at the start of a
+paragraph is syntactically relevant.
+
 =over
     
 =item C<=COMMAND CONTENT>
+X<command>
 
-A line beginning with the C<=> symbol denotes a single command. Usually this
+A line beginning with the C<=> symbol denotes a single I<command>. Usually this
 will be some sort of header, perhaps the equivalent of a C<< <hr> >>, something
-like that. In essence, it is a single tag rather than a block. The function of
-C<CONTENT> is up to you.
+like that. It is roughly equivalent to the self-closing tag in XML. B<CONTENT>
+is just text that may or may not be present. The relationship of B<CONTENT> to
+the B<COMMAND> is for you to define, as is the meaning of B<COMMAND>.
 
-=item C<+COMMAND CONTENT>
+When a C<=COMMAND> block is completed, it is passed to L<handle_command>.
 
-A line beginning with C<+> is the start of a named block. The C<COMMAND> is
-arbitrary and is handled by the method C<begin_COMMAND> in your subclass.
+=item C<+NAME CONTENT>
+X<begin>
 
-What you do with C<CONTENT> is up to you.
+A line beginning with C<+> opens a named block; its name is B<NAME>. Similar to
+C<=COMMAND>, the B<CONTENT> is arbitrary, and its relationship to the B<NAME> of
+the block is up to you.
 
-This command is not considered complete until a blank line is encountered. This
-is to allow you to extend a lot of C<CONTENT> across multiple lines.
+When this is encountered you are invited to L<handle_begin>.
 
-=item C<-COMMAND>
+=item C<-NAME>
+X<end>
 
 A line beginning with C<-> is the end of the named block previously started.
+These must match in reverse order to the C<+> block with the matching B<NAME> -
+basically the same as XML's <NAME></NAME> pairs. It is passed to L<handle_end>,
+and unlike the other two command paragraphs it accepts no content.
 
-=item C<< X<> >>
+=back
 
-As with POD, you can create inline formatting codes using the C<< X<> >> syntax,
-except in this, the X is any arbitrary letter and you define it yourself. Also
-as with POD, you can use any number of C<< <> >> characters as a form of
-escaping text that itself contains them.
+Then there are two types of text paragraph, for which the text is not
+syntactically relevant but whitespace still is:
 
-The only exception to the X being arbitrary is C<< Z<> >>, which has the same
-functionality as in POD, i.e. is a non-printing, empty character used entirely
-as a separator to divide ambiguous syntax.
 
-=item Paragraphs
+Then there is the standard POD entity, except with extensions:
 
-Any solid block of text is considered to be a single paragraph. Newlines are
-ignored, except where there is a blank line. A blank line separates paragraphs.
-
-In paragraphs, multiple whitespace is I<collapsed> before it gets to you. This
-simply means that your entire paragraph is consistenly spaced. Run a subs. on it
-if you want to alter the whitespace again but since this is primarily designed 
-for web use it's largely irrelevant.
-
-This includes newlines. Lines are joined into one long one.
+=over
 
 =item Verbatim paragraphs
 
-Lines beginning with a blank line are considered to be verbatim paragraphs.
-Unlike many POD parsers, the correct behaviour of this format is to remove the
-leading whitespace once the entire paragraph has been collected.
+A line whose first character is whitespace is considered verbatim. No removal of
+whitespace is done to the rest of the paragraph if the first character is
+whitespace; all your text is repeated verbatim, hence the name
 
-Due to the expected purpose of verbatim paragraphs (code, usually), blank lines
-will not separate them, but will instead be part of the long paragraph. A
-verbatim paragraph is not considered to have ended until a C<=> or C<+> command
-or a normal paragraph is encountered.
+The verbatim paragraph continues until the first non-verbatim paragraph is
+encountered. A blank line is no longer considered to end the paragraph.
+Therefore, two verbatim paragraphs can only be separated by a non-verbatim
+paragraph with non-whitespace content. The special formatting code C<< ZZ<><> >>
+can be used on its own to separate them with zero-width content.
 
-A useful trick to note is that you can separate verbatim paragraphs by putting
-a C<< Z<> >> on its own on a line with I<no> whitespace, basically in order to
-create an empty normal paragraph between the two verbatim paragraphs.
+All lines in the verbatim paragraph will have their leading whitespace removed.
+This is done intelligently: the I<minimum> amount of leading whitespace found on
+any line is removed from all lines. This allows you to indent other lines (even
+the first one) relative to the syntactic whitespace that defines the verbatim
+paragraph without your indentation being parsed out.
+
+L<Entities> are not parsed in verbatim paragraphs, as expected.
+
+When a verbatim paragraph has been collated, it is passed to L<handle_verbatim>.
+
+=item Paragraphs
+
+Everything that doesn't get caught by one of the above rules is deemed to be a
+plain text paragraph. As with all paragraphs, a single line break is removed by
+the parser and a blank line causes the paragraph to be processed. It is passed
+to L<handle_paragraph>.
+
+=back
+
+And finally the inline formatting markup, entities.
+
+=over
+
+=item C<< XZ<><> >>
+X<entity> X<entities>
+
+An entity is defined as a capital letter followed by a delimiter that is
+repeated n times, then any amount of text up to a matching quantity of a
+balanced delimiter.
+
+In normal POD the only delimiter is C<< < >>, so entities have the format C<<
+XZ<><> >>; except that the opening delimiter may be duplicated as long as the
+closing delimiter matches, allowing you to put the delimiter itself inside the
+entity: C<<< XZ<><<>> >>>; in Pod::Cats you can use any delimiter, removing the
+requirement to duplicate it at all: C<< C[ XZ<><> ] >>.
+
+Once an entity has begun, nested entities are only considered if the delimiters
+are the same as those used for the outer entity: C<B[ I[bold-italic] ]>
+C<B[IZ<><bold>]>.
+
+Apart from the special entity C<< ZZ<><> >>, the letter used for the entity has
+no inherent meaning to Pod::Cats. The parsed entity is provided to
+L<handle_entity>. C<< ZZ<><> >> retains its meaning from POD, which is to be a
+zero-width 'divider' to break up things that would otherwise be considered
+syntax.
 
 =back
 
@@ -101,11 +143,25 @@ create an empty normal paragraph between the two verbatim paragraphs.
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 =head2 new
 
-Create a new parser. Currently, no options.
+Create a new parser. Options are provided as a hashref, but there is currently
+only one:
+
+=over
+
+=item delimiters
+
+A string containing delimiters to use. Bracketed delimiters will be balanced;
+other delimiters will simply be used as-is. This echoes the delimiter philosophy
+of Perl syntax such as regexes and C<q{}>. The string should be all the possible
+delimiters, listed once each, and only the opening brackets of balanced pairs.
+
+The default is C<< '<' >>, same as POD.
+
+=back
 
 =cut
 
@@ -151,7 +207,8 @@ sub parse_file {
 
 L<parse> and L<parse_file> both come here, which just takes the markup text
 as an array of lines and parses them. So it just takes the result of a
-slurp or a split /\n/ and parses it. This is where the logic happens.
+slurp or a split /\n/ and parses it. This is where the logic happens. It is
+exposed publicly so you can parse an array of your own if you want.
 
 =cut
 
@@ -286,7 +343,8 @@ sub _postprocess_dom {
 }
 
 # Now is the sax-like bit, where it goes through and fires the user's events for
-# the various types.
+# the various types. TODO: what's the point in sax-like if you already made a
+# DOM? Make this part of the parsing process and create the DOM out of the SAX.
 sub _postprocess_paragraphs {
     my $self = shift;
 
@@ -322,34 +380,44 @@ sub _postprocess_paragraphs {
 
 =head2 handle_verbatim
 
-You are given the verbatim paragraph as an array. It has had the leading 
-whitespace removed already. It's not joined into one string yet because you 
-will probably want to know the separate lines.
+The verbatim paragraph as it was in the code, except with the minimum amount of
+whitespace stripped from each line as described in L<verbatim>. Passed in as a
+single string with line breaks preserved.
+
+Do whatever you want. Default is to return the string straight back atcha.
 
 =cut
 
 sub handle_verbatim {
     shift;
-    return @_;
+    shift;
 }
 
 =head2 handle_entity
 
-For any entity (C<< Z<> >>) encountered, its letter is provided to the
-handle_entity method, along with the contents inside it.
+Passed the letter of the L<entity> and its content. The content may be multiple
+things; the rest of @_ contains them in order. This is to allow for nested
+entities. The return values of each nested entity and any plain text in between
+them are contained in the rest of @_.
 
-Entites are recognised by their C<< < > >>. As long as they balance, you can use
-any number of them to surround the content of the entity. This allows you to use
-these characters themselves in the content.
+For this reason you should return a scalar from this method, be it text or a
+ref. The default is to concatenate @_, thus replacing entities with their
+contents.
 
-The C<< Z<> >> entity is special. This is not passed off to this handler. The
-C<< Z<> >> entity allows you to do something like C<< CZ<><> >> in order to
-"escape" the entity from being recognised. In short, it does nothing except be
-there in the source.
+Note that this method is the only one whose return value is of relevance to the
+parser, since what you return from this will appear in another handler,
+depending on what type of paragraph the entity is in.
+
+You will never get the C<< ZZ<><> >> entity.
 
 =cut
 
-# preprocess paragraph before giving it to the user.
+sub handle_entity {
+    shift; join ' ', @_;
+}
+
+# preprocess paragraph before giving it to the user. handle_entity is called
+# from the parser itself.
 sub _process_entities {
     my ($self, $para) = @_;
 
@@ -368,62 +436,71 @@ sub _process_entities {
 
 =head2 handle_paragraph
 
-You get a paragraph, which has had its C<< X<> >> entities handled already.
-Do what you wish, and then return it. It is all on one line.
+The contents of the paragraph are provided as an array, i.e. all of @_
+represents the separate sections of the paragraph. The paragraph's sections will
+alternate between a string of plain text and the return value of
+L<handle_entity>, assuming it has at least one of each. Note that a paragraph
+may start with an entity so the first value of @_ is not necessarily a string.
+
+By default it returns @_ concatenated, since the default behaviour of
+L<handle_entity> is to remove the formatting but keep the contents.
 
 =cut
 
 sub handle_paragraph {
-    shift; shift;
+    shift; join ' ', @_;
 }
 
 =head2 handle_command
 
-For each command (C<=foo>) encountered, it is passed to C<handle_command>.
-Do stuff with it and return a scalar of any type.
+When a L<command> is encountered it comes here. The first argument is the
+B<COMMAND> (from B<=COMMAND>); the rest of the arguments follow the rules of
+paragraphs and alternate between plain text and parsed entities.
+
+By default it returns @_ concatenated, same as paragraphs.
 
 =cut
 
 sub handle_command {
-    shift; shift;
+    shift; shift; join ' ', @_;
 }
 
 =head2 handle_begin
 
-When a begin command (C<+foo>) is encountered, it is passed to this function for
-processing. The first argument (after C<$self>) will be the tag name ("foo");
-the second will be the content of the command with the whitespace collapsed.
+This is handled the same as L<handle_command>, except it is called when the
+L<begin> command is encountered. The same rules apply.
 
 =cut
 
 sub _handle_begin {
-    shift; shift; shift;
+    shift; shift; join ' ', @_;
 }
 
 =head2 handle_end
 
-The counterpart to the begin handler. This handles your C<-foo> commands. Note
-that if you close a tag that is not opened, or is simply out of order, you will 
-receive a warning and the command will be ignored. The handler is passed the tag
-name; end tags accept no content.
+The counterpart to the begin handler. This is called when the L<end> paragraph
+is encountered. The parser will already have discovered whether your begins and
+ends are not balanced so you don't need to worry about that.
+
+Note that there is no content for an end paragraph so the only argument this
+gets is the command name.
 
 =cut
 
-sub handle_end {
-    shift; shift; shift;
-}
+sub handle_end { }
 
 =head1 TODO
 
-The only difference between this and POD is that it doesn't have the C<=cut> tag
-to allow it to be inserted into other files. That's because I've developed it as
-a markup language for articles rather than documentation. Shouldn't be hard to 
-implement this, however, so I will get around to it.
+=over
 
-I would rather do this in a nested way, since it has nestable commands.
-Currently the matching of begin/end commands is a bit naive.
+=item The document is parsed into DOM, then events are fired SAX-like.
+Preferable to fire the events and build the DOM from that.
 
-Line numbers of errors are not yet reported.
+=item Currently the matching of begin/end commands is a bit naive.
+
+=item Line numbers of errors are not yet reported.
+
+=back
 
 =head1 AUTHOR
 
@@ -440,6 +517,11 @@ You are reading the only documentation for this module.
 For more help, give me a holler on irc.freenode.com #perl
 
 =head1 ACKNOWLEDGEMENTS
+
+Paul Evans (LeoNerd) basically wrote Parser::MGC because I was whining about not
+being able to parse these entity delimiters with any of the token parsers I
+could find; and then he wrote a POD example that I only had to tweak in order to
+do so. So a lot of the credit should go to him!
 
 =head1 LICENSE AND COPYRIGHT
 
