@@ -4,7 +4,6 @@ use warnings;
 use strict;
 use 5.010;
 
-use Data::Dumper;
 use Pod::Cats::Parser::MGC;
 use List::Util qw(min);
 use Carp;

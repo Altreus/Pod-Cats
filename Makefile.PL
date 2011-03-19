@@ -14,6 +14,9 @@ WriteMakefile(
     PREREQ_PM => {
         'Test::More' => 0,
         'Parser::MGC' => 0.06,
+        'List::Util' => 1.21,
+        'Carp'      => 1.11,
+        'Data::Dumper' => 0,
     },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean               => { FILES => 'Pod-Cats-*' },

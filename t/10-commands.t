@@ -2,15 +2,13 @@
 
 use strict;
 use warnings;
-use Data::Dumper;
 
 my $pc = Pod::Cats::Test->new();
 chomp(my @lines = <DATA>);
-print Dumper $pc->parse_lines(@lines);
+$pc->parse_lines(@lines);
 
 package Pod::Cats::Test;
 
-use Data::Dumper;
 use Test::More 'no_plan';
 
 use parent 'Pod::Cats';
