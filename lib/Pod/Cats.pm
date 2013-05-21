@@ -330,7 +330,6 @@ sub _postprocess_dom {
             # Node type changed, push old one
             if ($last_node->{type} eq 'verbatim') {
                 my $to_remove = $last_node->{indent_level};
-                print "[[$to_remove]] [[$last_node->{content}]]\n";
                 $last_node->{content} =~ s/^ {$to_remove}//mg if $to_remove;
             }
             push @new_dom, $last_node;
