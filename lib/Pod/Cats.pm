@@ -291,8 +291,7 @@ sub _process_buffer {
         }
         when('verbatim') {
             # find the lowest level of indentation in this buffer and strip it
-            my $indent_level = min_by { /^(\s+)/; length $1 } @buffer;
-            s/^\s{$indent_level}// for @buffer;
+            my $indent_level = min map { /^(\s+)/; length $1 } @buffer;
             $node->{content} = join "\n", @buffer;
             $node->{indent_level} = $indent_level;
         }
