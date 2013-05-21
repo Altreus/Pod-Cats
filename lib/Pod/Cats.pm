@@ -5,7 +5,8 @@ use strict;
 use 5.010;
 
 use Pod::Cats::Parser::MGC;
-use List::Util qw(min);
+use List::UtilsBy qw(min_by);
+use List::Util qw(min max);
 use Carp;
 
 =head1 NAME
@@ -282,7 +283,7 @@ sub _process_buffer {
         type => $buffer_type
     };
 
-    given ($buffer_type) {
+    for ($buffer_type) {
         when('paragraph') {
             # concatenate the lines and normalise whitespace.
             my $para = join " ", @buffer;
