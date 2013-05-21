@@ -5,7 +5,6 @@ use strict;
 use 5.010;
 
 use Pod::Cats::Parser::MGC;
-use List::UtilsBy qw(min_by);
 use List::Util qw(min max);
 use Carp;
 
