@@ -350,7 +350,9 @@ sub _postprocess_paragraphs {
     for my $node (@{ $self->{dom} }) {
         for ($node->{type}) {
             when ('paragraph') {
-                $node->{content} = $self->_process_entities($node->{content});
+                # If _process_entities gives us undef, that was a single Z<>, which should not
+                # generate a new paragraph.
+                $node->{content} = $self->_process_entities($node->{content}) // next;
                 $self->handle_paragraph($node->{content});
             }
             when ('begin') {
@@ -429,7 +431,7 @@ sub _process_entities {
     my $parsed = $self->{parser}->from_string( $para );
     $parsed = $parsed->[0]; 
 
-    return $parsed;
+    return defined $parsed ? $parsed : ();
 }
 
 =head2 handle_paragraph

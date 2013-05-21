@@ -45,7 +45,7 @@ sub parse {
                     }
                 ) ] unless $tag eq 'Z';
 
-                return '';
+                return undef;
             },
 
             sub { 
