@@ -228,7 +228,7 @@ sub parse_lines {
     shift @lines while $lines[0] !~ /\S/; # shift off leading blank lines!
 
     for my $line (@lines) {
-        given ($line) {
+        for ($line) {
             when (/^\s*$/) {
                 $self->_process_buffer(@buffer);
                 @buffer = ();
@@ -345,7 +345,7 @@ sub _postprocess_paragraphs {
     my $self = shift;
 
     for my $node (@{ $self->{dom} }) {
-        given ($node->{type}) {
+        for ($node->{type}) {
             when ('paragraph') {
                 $node->{content} = $self->_process_entities($node->{content});
                 $self->handle_paragraph($node->{content});
