@@ -320,15 +320,18 @@ sub _postprocess_dom {
         # Don't change the last node until we stop finding verbatims.
         # That way we can keep using it as the concatenated node.
         if ($last_node->{type} eq 'verbatim' && $node->{type} eq 'verbatim') {
-            my $to_remove = 
-                max( $last_node->{indent_level}, $node->{indent_level})
-              - min( $last_node->{indent_level}, $node->{indent_level});
-            $last_node->{content} .= "\n" . $node->{content};
+            # The smallest indent level is considered the level for the merged node.
+            $last_node->{indent_level} =
+                min( $last_node->{indent_level}, $node->{indent_level});
+            $last_node->{content} .= "\n\n" . $node->{content};
 
-            # If the min indent has gone down, raze more spaces off.
-            $last_node->{content} =~ s/^\s{$to_remove}//mg if $to_remove;
         } else {
             # Node type changed, push old one
+            if ($last_node->{type} eq 'verbatim') {
+                my $to_remove = $last_node->{indent_level};
+                print "[[$to_remove]] [[$last_node->{content}]]\n";
+                $last_node->{content} =~ s/^ {$to_remove}//mg if $to_remove;
+            }
             push @new_dom, $last_node;
             $last_node = $node;
         }
