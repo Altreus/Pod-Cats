@@ -73,9 +73,6 @@ and unlike the other two command paragraphs it accepts no content.
 Then there are two types of text paragraph, for which the text is not
 syntactically relevant but whitespace still is:
 
-
-Then there is the standard POD entity, except with extensions:
-
 =over
 
 =item Verbatim paragraphs
@@ -195,7 +192,7 @@ sub parse_file {
     
     carp "File not found: " . $filename unless -e $filename;
 
-    open my $fh, "<", $filename;
+    open my $fh, "<", $filename or carp "Could not open $filename: $!";
     chomp(my @lines = <$fh>);
     close $fh;
 
