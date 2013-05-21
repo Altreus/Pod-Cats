@@ -4,10 +4,9 @@ use warnings;
 use 5.010;
 
 use parent qw(Parser::MGC);
-use Class::C3;
 
 sub new {
-    my $self = next::method(@_);
+    my $self = SUPER::new(@_);
     shift;
     my %o = @_;
     $self->{obj} = $o{object} or die "Expected argument 'object'";
