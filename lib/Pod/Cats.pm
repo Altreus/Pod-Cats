@@ -132,7 +132,9 @@ Apart from the special entity C<< ZZ<><> >>, the letter used for the entity has
 no inherent meaning to Pod::Cats. The parsed entity is provided to
 L</handle_entity>. C<< ZZ<><> >> retains its meaning from POD, which is to be a
 zero-width 'divider' to break up things that would otherwise be considered
-syntax.
+syntax. You are not given C<< ZZ<><> >> to handle, and C<< ZZ<><> >> itself will
+produce undef if it is the only content to an element. A paragraph comprising solely 
+C<< ZZ<><> >> will never generate a parsed paragraph; it will be skipped.
 
 =back
 
