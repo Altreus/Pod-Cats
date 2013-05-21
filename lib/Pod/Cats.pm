@@ -15,7 +15,7 @@ Pod::Cats - The POD-like markup language written for podcats.in
 
 =head1 VERSION
 
-Version 0.03
+Version 0.04
 
 =head1 DESCRIPTION
 
@@ -142,7 +142,7 @@ C<< ZZ<><> >> will never generate a parsed paragraph; it will be skipped.
 
 =cut
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 =head2 new
 
