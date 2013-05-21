@@ -527,7 +527,7 @@ do so. So a lot of the credit should go to him!
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2011 Altreus.
+Copyright 2013 Altreus.
 
 This module is released under the MIT licence.
 
