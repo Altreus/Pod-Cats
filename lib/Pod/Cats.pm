@@ -335,6 +335,7 @@ sub _postprocess_dom {
     }
 
     push @new_dom, $last_node;
+    $self->{dom} = \@new_dom;
 }
 
 # Now is the sax-like bit, where it goes through and fires the user's events for
