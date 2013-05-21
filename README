@@ -50,7 +50,7 @@ opened it.
 It is an error to open a block with + without closing it with a - paragraph, or
 to use a - paragraph that does not match the last-opened + paragraph.
 
-4. Entities
+5. Entities
 -----------
 
 Entities are not paragraphs but inline tags. They have the format Z<>, which is
