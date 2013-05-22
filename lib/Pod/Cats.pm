@@ -353,14 +353,14 @@ sub _postprocess_paragraphs {
                 # If _process_entities gives us undef, that was a single Z<>, which should not
                 # generate a new paragraph.
                 $node->{content} = $self->_process_entities($node->{content}) // next;
-                $self->handle_paragraph($node->{content});
+                $self->handle_paragraph(@{ $node->{content} });
             }
             when ('begin') {
                 $node->{content} = $self->_process_entities($node->{content});
                 # Check for balance later
                 push @{$self->{begin_stack}}, $node->{name};
 
-                $self->handle_begin($node->{name}, $node->{content});
+                $self->handle_begin($node->{name}, @{ $node->{content} // [] });
             }
             when ('end') {
                 warn "$node->{name} is ended out of sync!" 
@@ -370,7 +370,7 @@ sub _postprocess_paragraphs {
             }
             when ('command') {
                 $node->{content} = $self->_process_entities($node->{content});
-                $self->handle_command($node->{name}, $node->{content});
+                $self->handle_command($node->{name}, @{ $node->{content} // [] });
             }
             when ('verbatim') {
                 $self->handle_verbatim($node->{content});
