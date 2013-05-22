@@ -37,13 +37,14 @@ sub parse {
                 # different ones.
                 local $self->{delimiters} = substr $odel, 0, 1;
 
-                return [ $pod_cats->handle_entity( 
+                return $pod_cats->handle_entity( 
                     $tag => @{ 
                         $self->scope_of( undef, \&parse, $cdel ) 
                     }
-                ) ] unless $tag eq 'Z';
+                ) unless $tag eq 'Z';
 
-                return undef;
+                $self->expect( $cdel );
+                return;
             },
 
             sub { 

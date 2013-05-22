@@ -429,9 +429,9 @@ sub _process_entities {
     );
 
     my $parsed = $self->{parser}->from_string( $para );
-    $parsed = $parsed->[0]; 
 
-    return defined $parsed ? $parsed : ();
+    # Single return of undef was Z<>
+    return defined $parsed->[0] && @$parsed > 1 ? $parsed : ();
 }
 
 =head2 handle_paragraph
