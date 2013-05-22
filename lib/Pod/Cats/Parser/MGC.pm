@@ -68,8 +68,8 @@ sub parse {
             },
 
             sub { 
-                if ($self->{level}) {
-                    return $self->substring_before( qr/[A-Z]$self->{delimiters}/ );
+                if ($self->scope_level) {
+                    return $self->substring_before( qr/[A-Z]\Q$self->{delimiters}/ );
                 }
                 else {
                     return $self->substring_before( qr/[A-Z]$odre/ );
