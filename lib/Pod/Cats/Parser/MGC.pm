@@ -24,32 +24,57 @@ sub parse {
 
     my $ret = $self->sequence_of(sub { 
         $self->any_of(
-            sub { 
-                my $tag = $self->expect( qr/[A-Z](?=$odre)/ );
+            sub {
+                # After we're in 1 level we've committed to an exact delimiter.
+                my $tag;
+                if ($self->{level}) {
+                    $tag = $self->expect( qr/[A-Z](?=$self->{delimiters})/ );
+                }
+                else {
+                    $tag = $self->expect( qr/[A-Z](?=$odre)/ );
+                }
+
                 $self->commit;
 
-                my $odel = $self->expect( $odre );
-                $odel .= $self->expect( qr/\Q$odel\E*/ );
+                my $odel;
+                
+                if ($self->{level}) {
+                    $odel = $self->expect( $self->{delimiters} );
+                }
+                else {
+                    $odel = $self->expect( $odre );
+                    $odel .= $self->expect( qr/\Q$odel\E*/ );
+                }
 
                 (my $cdel = $odel) =~ tr/<({[/>)}]/;
 
                 # The opening delimiter is the same char repeated, never
                 # different ones.
-                local $self->{delimiters} = substr $odel, 0, 1;
+                local $self->{delimiters} = $odel;
+                $self->{level}++;
 
-                return $pod_cats->handle_entity( 
+                if ($tag eq 'Z') {
+                    $self->expect( $cdel );
+                    $self->{level}--;
+                    return;
+                }
+
+                my $retval = $pod_cats->handle_entity( 
                     $tag => @{ 
                         $self->scope_of( undef, \&parse, $cdel ) 
                     }
-                ) unless $tag eq 'Z';
-
-                $self->expect( $cdel );
-                return;
+                );
+                $self->{level}--;
+                return $retval;
             },
 
             sub { 
-                my $r = $self->substring_before( qr/[A-Z]$odre/ );
-                $r;
+                if ($self->{level}) {
+                    return $self->substring_before( qr/[A-Z]$self->{delimiters}/ );
+                }
+                else {
+                    return $self->substring_before( qr/[A-Z]$odre/ );
+                }
             },
         )
    });
