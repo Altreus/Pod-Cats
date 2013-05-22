@@ -448,7 +448,7 @@ contents.
 =cut
 
 sub handle_paragraph {
-    shift; join ' ', @_;
+    shift; join ' ', map $_ // '', @_;
 }
 
 =head2 handle_command
@@ -463,7 +463,7 @@ By default it returns @_ concatenated, same as paragraphs.
 =cut
 
 sub handle_command {
-    shift; shift; join ' ', @_;
+    shift; shift; join ' ', map $_ // '', @_;
 }
 
 =head2 handle_begin
@@ -474,7 +474,7 @@ L</begin|begin> command is encountered. The same rules apply.
 =cut
 
 sub _handle_begin {
-    shift; shift; join ' ', @_;
+    shift; shift; join ' ', map $_ // '', @_;
 }
 
 =head2 handle_end
