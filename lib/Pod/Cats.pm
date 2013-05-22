@@ -432,7 +432,7 @@ sub _process_entities {
     my $parsed = $self->{parser}->from_string( $para );
 
     # Single return of undef was Z<>
-    return defined $parsed->[0] && @$parsed > 1 ? $parsed : ();
+    return defined $parsed->[0] || @$parsed > 1 ? $parsed : ();
 }
 
 =head2 handle_paragraph
