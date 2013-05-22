@@ -413,7 +413,8 @@ You will never get the C<< ZZ<><> >> entity.
 =cut
 
 sub handle_entity {
-    shift; join ' ', @_;
+    shift; shift; 
+    join ' ', map $_ // '', @_;
 }
 
 # preprocess paragraph before giving it to the user. handle_entity is called
