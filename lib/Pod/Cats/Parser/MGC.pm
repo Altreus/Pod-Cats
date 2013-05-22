@@ -20,25 +20,26 @@ sub parse {
 
     # Can't grab the whole lot with one re (yet) so I will grab one and expect
     # more.
-    my $odre = qr/[\Q$self->{delimiters}\E]/; 
 
     my $ret = $self->sequence_of(sub { 
+        my $odre;
+        if ($self->scope_level) {
+            $odre = qr/\Q$self->{delimiters}/;
+        }
+        else {
+            $odre = qr/[\Q$self->{delimiters}\E]/; 
+        }
+
         $self->any_of(
             sub {
                 # After we're in 1 level we've committed to an exact delimiter.
-                my $tag;
-                if ($self->{level}) {
-                    $tag = $self->expect( qr/[A-Z](?=$self->{delimiters})/ );
-                }
-                else {
-                    $tag = $self->expect( qr/[A-Z](?=$odre)/ );
-                }
+                my $tag = $self->expect( qr/[A-Z](?=$odre)/ );
 
                 $self->commit;
 
                 my $odel;
                 
-                if ($self->{level}) {
+                if ($self->scope_level) {
                     $odel = $self->expect( $self->{delimiters} );
                 }
                 else {
@@ -51,7 +52,6 @@ sub parse {
                 # The opening delimiter is the same char repeated, never
                 # different ones.
                 local $self->{delimiters} = $odel;
-                $self->{level}++;
 
                 if ($tag eq 'Z') {
                     $self->expect( $cdel );
@@ -64,7 +64,6 @@ sub parse {
                         $self->scope_of( undef, \&parse, $cdel ) 
                     }
                 );
-                $self->{level}--;
                 return $retval;
             },
 
