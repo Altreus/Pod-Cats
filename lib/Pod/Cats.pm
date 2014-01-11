@@ -260,6 +260,13 @@ sub parse_lines {
             default {
                 # Nothing special, continue previous buffer or start a paragraph.
                 push @buffer, "paragraph" if !@buffer;
+                if ($buffer[0] eq 'verbatim') {
+                    warn "Verbatim paragraph not terminated before line starting "
+                      . substr($line, 0, 15);
+
+                    $self->_process_buffer(@buffer);
+                    @buffer = "paragraph";
+                }
                 push @buffer, $line;
             }
         }
