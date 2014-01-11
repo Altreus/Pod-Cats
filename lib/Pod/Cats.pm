@@ -226,9 +226,15 @@ sub parse_lines {
     #    buffer and start a new one with this.
     #  - Anything else continues the previous buffer, or starts a normal paragraph
 
+    my $line_num = @lines;
     shift @lines while $lines[0] !~ /\S/; # shift off leading blank lines!
 
+    # Adjust for lines we removed.
+    $line_num = $line_num - @lines;
+
     for my $line (@lines) {
+        $line_num++;
+
         for ($line) {
             when (/^\s*$/) {
                 $self->_process_buffer(@buffer);
@@ -237,7 +243,7 @@ sub parse_lines {
             when (/^([=+-])/) {
                 my $type = $1;
                 if (@buffer) {
-                    warn "$type command found without leading blank line.";
+                    warn "$type command found without leading blank line on line $line_num\n.";
 
                     $self->_process_buffer(@buffer);
                     @buffer = ();
@@ -262,7 +268,8 @@ sub parse_lines {
                 push @buffer, "paragraph" if !@buffer;
                 if ($buffer[0] eq 'verbatim') {
                     warn "Verbatim paragraph not terminated before line starting "
-                      . substr($line, 0, 15);
+                      . substr($line, 0, 15)
+                      . " on line $line_num\n";
 
                     $self->_process_buffer(@buffer);
                     @buffer = "paragraph";
