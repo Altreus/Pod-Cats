@@ -19,28 +19,29 @@ use parent 'Pod::Cats';
 
 sub handle_entity {
     my $self = shift;
-    
+
     my $entity = shift;
     my $content = shift;
 
-    given ($entity) {
-        when('B') {
-            is($content, 'brackets', 'B[] entity discovered' );
-        }
-        when('C') {
-            fail( 'C<> should not have been parsed.' );
-        }
-        when('P') {
-            is($content, 'pipes', 'P|| entity discovered');
-        }
-        when('T') {
-            is($content, ' Two|pipes ', 'T|| || used two pipes!');
-        }
-        default {
-            fail(Dumper [$entity, $content]);
-        }
-    }
+    my $test = {
+        B => [is => $content, 'brackets', 'B[] entity discovered'],
+        C => [fail => 'C<> should not have been parsed.'],
+        P => [is => $content, 'pipes', 'P|| entity discovered'],
+        T => [is => $content, ' Two|pipes ', 'T|| || used two pipes!'],
+    }->{$entity} // die Dumper [ $entity, $content ];
+
+    entity_test($test);
     return $content;
+}
+
+sub entity_test {
+    my @test = @{(shift)};
+    my $type = shift @test;
+
+    return &is( @test )
+        if $type eq 'is';
+    return &fail( @test )
+        if $type eq 'fail';
 }
 
 1;

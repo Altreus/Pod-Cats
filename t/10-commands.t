@@ -23,18 +23,18 @@ my @expected_order = qw(
 
 sub handle_begin {
     my $self = shift;
-    
+
     fail('this is not +intro!') and return unless shift eq 'intro';
 
     pass('+intro dispatched to handle_begin');
     is_deeply($self->{begin_stack}, ['intro'], 'begin stack looks OK');
-    is(shift, 'Since there is no blank line, this is part of the begin command.', 
+    is(shift, 'Since there is no blank line, this is part of the begin command.',
         'Content of intro begin is OK');
 }
 
 sub handle_end {
     my $self = shift;
-    
+
     fail('this is not -intro!') and return unless shift eq 'intro';
 
     pass('-intro dispatched to handle_end');
@@ -48,7 +48,7 @@ sub handle_paragraph {
 
     $self->{i} //= 0;
     if ($self->{i} == 0) {
-        is(shift, 
+        is(shift,
 'This is a basic paragraph in the "intro" paragraph. This line wraps at 80 characters but should be processed as a single line.',
         'Got first paragraph');
         $self->{i}++;
@@ -62,7 +62,7 @@ sub handle_paragraph {
 
 sub handle_command {
     my $self = shift;
-    
+
     fail('this is not =head1!') and return unless shift eq 'head1';
 
     pass('head1 dispatched to handle_command');
