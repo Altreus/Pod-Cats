@@ -240,10 +240,10 @@ sub parse_lines {
                 $self->_process_buffer(@buffer);
                 @buffer = ();
             }
-            if (/^([=+-])/) {
+            elsif (/^([=+-])/) {
                 my $type = $1;
                 if (@buffer) {
-                    warn "$type command found without leading blank line on line $line_num\n.";
+                    warn "$type command found without leading blank line on line $line_num.\n";
 
                     $self->_process_buffer(@buffer);
                     @buffer = ();
@@ -259,11 +259,11 @@ sub parse_lines {
                 # bit of buffer contents.
                 push @buffer, grep {$_} ($line =~ /^\Q$type\E(.+?)\b\s*(.*)$/);
             }
-            if (/^\s+\S/) {
+            elsif (/^\s+\S/) {
                 push @buffer, "verbatim" if !@buffer;
                 push @buffer, $line;
             }
-            default {
+            else {
                 # Nothing special, continue previous buffer or start a paragraph.
                 push @buffer, "paragraph" if !@buffer;
                 if ($buffer[0] eq 'verbatim') {
@@ -304,18 +304,18 @@ sub _process_buffer {
             my $para = join " ", @buffer;
             $node->{content} = $para;
         }
-        if($_ eq 'verbatim') {
+        elsif($_ eq 'verbatim') {
             # find the lowest level of indentation in this buffer and strip it
             my $indent_level = min map { /^(\s+)/; length $1 } @buffer;
             $node->{content} = join "\n", @buffer;
             $node->{indent_level} = $indent_level;
         }
-        if($_ eq 'command' || $_ eq 'begin') {
+        elsif($_ eq 'command' || $_ eq 'begin') {
             $node->{name} = shift @buffer;
             my $content = join " ", @buffer;
             $node->{content} = $content;
         }
-        if($_ eq 'end') {
+        elsif($_ eq 'end') {
             $node->{name} = shift @buffer; # end tags take no content
         }
     }
@@ -482,8 +482,8 @@ sub handle_command {
 
 =head2 handle_begin
 
-This is handled the same as L<handle_command|/handle_command>, except it is called when a
-L</begin|begin> command is encountered. The same rules apply.
+This is handled the same as L<handle_command|/handle_command>, except it is
+called when a L<begin|/begin> command is encountered. The same rules apply.
 
 =cut
 
