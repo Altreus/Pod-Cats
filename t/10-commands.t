@@ -9,6 +9,7 @@ $pc->parse_lines(@lines);
 
 package Pod::Cats::Test;
 
+use Data::Dump;
 use Test::More 'no_plan';
 
 use parent 'Pod::Cats';
@@ -27,7 +28,6 @@ sub handle_begin {
     fail('this is not +intro!') and return unless shift eq 'intro';
 
     pass('+intro dispatched to handle_begin');
-    is_deeply($self->{begin_stack}, ['intro'], 'begin stack looks OK');
     is(shift, 'Since there is no blank line, this is part of the begin command.',
         'Content of intro begin is OK');
 }
@@ -38,7 +38,6 @@ sub handle_end {
     fail('this is not -intro!') and return unless shift eq 'intro';
 
     pass('-intro dispatched to handle_end');
-    is_deeply($self->{begin_stack}, [], 'begin stack looks OK');
 }
 
 sub handle_paragraph {
@@ -63,7 +62,12 @@ sub handle_paragraph {
 sub handle_command {
     my $self = shift;
 
-    fail('this is not =head1!') and return unless shift eq 'head1';
+    unless(shift eq 'head1')
+    {
+        diag dd \@_;
+        fail('this is not =head1!');
+        return
+    }
 
     pass('head1 dispatched to handle_command');
     is(shift, 'TEST POD::CATS',

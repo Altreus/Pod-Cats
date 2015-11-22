@@ -24,6 +24,7 @@ This is a second line.'],
 This is a second line.
 
   This is indented.'],
+        ['paragraph', ""],
         ['verbatim', 'This is a new paragraph.
 
 This is not.'],

@@ -7,6 +7,7 @@ use 5.010;
 use Pod::Cats::Parser::MGC;
 use List::Util qw(min max);
 use Carp;
+use String::Util qw/crunch/;
 
 =head1 NAME
 
@@ -213,11 +214,7 @@ sub parse_lines {
     my ($self, @lines) = @_;
 
     my $result = "";
-
-    # The buffer type goes in the first element, and its
-    # contents, if any, in the rest.
-    my @buffer;
-    $self->{dom} = [];
+    $self->_new_buffer;
 
     # Special lines are:
     #  - a blank line. An exception is between verbatim paragraphs, so we will
@@ -237,160 +234,165 @@ sub parse_lines {
 
         for ($line) {
             if (/^\s*$/) {
-                $self->_process_buffer(@buffer);
-                @buffer = ();
+                $self->_handle_blank_line;
             }
             elsif (/^([=+-])/) {
                 my $type = $1;
-                if (@buffer) {
-                    warn "$type command found without leading blank line on line $line_num.\n";
-
-                    $self->_process_buffer(@buffer);
-                    @buffer = ();
-                }
-
-                push @buffer, {
+                my $buftype = {
                     '+' => 'begin',
                     '-' => 'end',
                     '=' => 'command',
-                }->{$type} or die "Don't know what to do with $type";
+                }->{$type};
 
-                # find and push the command name onto it; the rest is the first
-                # bit of buffer contents.
-                push @buffer, grep {$_} ($line =~ /^\Q$type\E(.+?)\b\s*(.*)$/);
+                # First word is command name; rest is buffer.
+                my ($command, $buffer) = $line =~ /^\Q$type\E(\w+)\s*(.*)$/;
+
+                $self->_handle_command_line($buftype, $command);
+                $self->_buffer($buffer);
             }
             elsif (/^\s+\S/) {
-                push @buffer, "verbatim" if !@buffer;
-                push @buffer, $line;
+                $self->_handle_verbatim_line($line);
             }
             else {
-                # Nothing special, continue previous buffer or start a paragraph.
-                push @buffer, "paragraph" if !@buffer;
-                if ($buffer[0] eq 'verbatim') {
-                    warn "Verbatim paragraph not terminated before line starting "
-                      . substr($line, 0, 15)
-                      . " on line $line_num\n";
-
-                    $self->_process_buffer(@buffer);
-                    @buffer = "paragraph";
-                }
-                push @buffer, $line;
+                $self->_handle_normal_line($line);
             }
         }
     }
 
-    $self->_process_buffer(@buffer) if @buffer;
-    $self->_postprocess_dom();
-
-    $self->_postprocess_paragraphs();
-    return $self->{dom};
+    $self->_end_of_line;
 }
 
-# Adds the buffer and some metadata to the DOM, returning nothing.
+sub _buffer {
+    my $self = shift;
+    push @{ $self->{buffer} }, @_;
+}
+
+sub _new_buffer {
+    my $self = shift;
+    # The buffer type goes in the first element, and its
+    # contents, if any, in the rest.
+    $self->{buffer} = [];
+}
+
+sub _end_previous_buffer {
+    my $self = shift;
+    return unless $self->_buftype;
+
+    if ($self->_buftype eq 'verbatim') {
+        warn "Verbatim paragraph ended without blank line"
+            if $self->{buffer}->[-1] =~ /\S/;
+
+        $self->_process_buffer;
+        return
+    }
+
+    warn $self->_buftype . " ended without blank line";
+    $self->_process_buffer;
+
+    return 0;
+}
+
+sub _handle_blank_line {
+    my $self = shift;
+    return unless $self->_buftype;
+
+    # Handle a verbatim buffer when a different buffer starts, or we run out of
+    # lines.
+    if ($self->_buftype eq 'verbatim') {
+        $self->_buffer('');
+        return;
+    }
+
+    $self->_process_buffer;
+}
+
+sub _handle_command_line {
+    my $self = shift;
+    my $type = shift;
+    my $command = shift;
+
+    $self->_end_previous_buffer;
+
+    $self->_buffer($type, $command);
+}
+
+# Verbatim lines just get buffered until something else happens.
+sub _handle_verbatim_line {
+    my $self = shift;
+
+    if ($self->_buftype ne 'verbatim') {
+        $self->_end_previous_buffer;
+        $self->_buffer('verbatim');
+    }
+    $self->_buffer(@_);
+}
+
+sub _handle_normal_line {
+    my $self = shift;
+    my $line = shift;
+
+    # Nothing special, continue previous buffer or start a paragraph.
+    if ($self->_buftype eq 'verbatim') {
+        $self->_end_previous_buffer;
+    }
+
+    if (not $self->_buftype) {
+        $self->_buffer('paragraph');
+    }
+
+    $self->_buffer($line);
+}
+
+sub _buftype {
+    my $self = shift;
+    if (@{ $self->{buffer} }) {
+        return $self->{buffer}->[0];
+    }
+    return '';
+}
+
+sub _end_of_line {
+    my $self = shift;
+    $self->_process_buffer;
+}
+
 sub _process_buffer {
-    my ($self, @buffer) = @_;
+    my $self = shift;
 
-    return '' unless @buffer;
+    return '' unless $self->_buftype;
 
-    my $buffer_type = shift @buffer;
+    my @buffer = @{$self->{buffer}};
 
-    my $node = {
-        type => $buffer_type
-    };
-
-    for ($buffer_type) {
+    for (shift @buffer) {
         if($_ eq 'paragraph') {
             # concatenate the lines and normalise whitespace.
-            my $para = join " ", @buffer;
-            $node->{content} = $para;
+            my $para = crunch(join " ", @buffer);
+            $self->handle_paragraph($self->_process_entities($para));
+            $self->_new_buffer;
         }
         elsif($_ eq 'verbatim') {
+            # There will have been a warning if this is not the empty string
+            pop @buffer if $buffer[-1] eq '';
+
             # find the lowest level of indentation in this buffer and strip it
-            my $indent_level = min map { /^(\s+)/; length $1 } @buffer;
-            $node->{content} = join "\n", @buffer;
-            $node->{indent_level} = $indent_level;
+            # Avoid zeroes from blank lines in between
+            my $indent_level = min map { /^(\s*)/; length $1 || () } @buffer;
+            s/^\s{$indent_level}// for @buffer;
+
+            my $para = join "\n", @buffer;
+            $self->handle_verbatim($para);
         }
         elsif($_ eq 'command' || $_ eq 'begin') {
-            $node->{name} = shift @buffer;
-            my $content = join " ", @buffer;
-            $node->{content} = $content;
+            my $type = shift @buffer;
+            my $content = crunch(join " ", @buffer);
+            $self->${\"handle_$_"}($type, $self->_process_entities($content));
         }
         elsif($_ eq 'end') {
-            $node->{name} = shift @buffer; # end tags take no content
+            $self->handle_end($buffer[0]);
         }
     }
 
-    push @{$self->{dom}}, $node;
-}
-
-# This is basically just to merge verbatims together
-sub _postprocess_dom {
-    my $self = shift;
-
-    my @new_dom;
-    my $last_node;
-    for my $node (@{$self->{dom}}) {
-        $last_node = $node and next unless defined $last_node;
-
-        # Don't change the last node until we stop finding verbatims.
-        # That way we can keep using it as the concatenated node.
-        if ($last_node->{type} eq 'verbatim' && $node->{type} eq 'verbatim') {
-            # The smallest indent level is considered the level for the merged node.
-            $last_node->{indent_level} =
-                min( $last_node->{indent_level}, $node->{indent_level});
-            $last_node->{content} .= "\n\n" . $node->{content};
-
-        } else {
-            # Node type changed, push old one
-            if ($last_node->{type} eq 'verbatim') {
-                my $to_remove = $last_node->{indent_level};
-                $last_node->{content} =~ s/^ {$to_remove}//mg if $to_remove;
-            }
-            push @new_dom, $last_node;
-            $last_node = $node;
-        }
-    }
-
-    push @new_dom, $last_node;
-    $self->{dom} = \@new_dom;
-}
-
-# Now is the sax-like bit, where it goes through and fires the user's events for
-# the various types. TODO: what's the point in sax-like if you already made a
-# DOM? Make this part of the parsing process and create the DOM out of the SAX.
-sub _postprocess_paragraphs {
-    my $self = shift;
-
-    for my $node (@{ $self->{dom} }) {
-        for ($node->{type}) {
-            if ($_ eq 'paragraph') {
-                # If _process_entities gives us undef, that was a single Z<>, which should not
-                # generate a new paragraph.
-                $node->{content} = $self->_process_entities($node->{content}) // next;
-                $self->handle_paragraph(@{ $node->{content} });
-            }
-            if ($_ eq 'begin') {
-                $node->{content} = $self->_process_entities($node->{content});
-                # Check for balance later
-                push @{$self->{begin_stack}}, $node->{name};
-
-                $self->handle_begin($node->{name}, @{ $node->{content} // [] });
-            }
-            if ($_ eq 'end') {
-                warn "$node->{name} is ended out of sync!"
-                    if pop @{$self->{begin_stack}} ne $node->{name};
-
-                $self->handle_end($node->{name});
-            }
-            if ($_ eq 'command') {
-                $node->{content} = $self->_process_entities($node->{content});
-                $self->handle_command($node->{name}, @{ $node->{content} // [] });
-            }
-            if ($_ eq 'verbatim') {
-                $self->handle_verbatim($node->{content});
-            }
-        }
-    }
+    $self->_new_buffer;
 }
 
 =head2 handle_verbatim
@@ -446,7 +448,7 @@ sub _process_entities {
     my $parsed = $self->{parser}->from_string( $para );
 
     # Single return of undef was Z<>
-    return defined $parsed->[0] || @$parsed > 1 ? $parsed : ();
+    return defined $parsed->[0] || @$parsed > 1 ? @$parsed : ();
 }
 
 =head2 handle_paragraph
@@ -487,7 +489,7 @@ called when a L<begin|/begin> command is encountered. The same rules apply.
 
 =cut
 
-sub _handle_begin {
+sub handle_begin {
     shift; shift; join ' ', map $_ // '', @_;
 }
 

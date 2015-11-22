@@ -9,9 +9,9 @@ use Test::Warnings ':all';
 
 my $pc = Pod::Cats->new();
 chomp(my @lines = <DATA>);
-like( 
-    warning {; $pc->parse_lines(@lines) }, 
-    qr/^Verbatim paragraph not terminated/,
+like(
+    warning {; $pc->parse_lines(@lines) },
+    qr/^Verbatim paragraph ended without blank line/,
     "Bad verbatim paragraph got warning"
 );
 
