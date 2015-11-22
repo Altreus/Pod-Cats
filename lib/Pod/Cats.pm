@@ -39,7 +39,7 @@ This character must be in the first column; whitespace at the start of a
 paragraph is syntactically relevant.
 
 =over 4
-    
+
 =item C<=COMMAND CONTENT>
 X<command>
 
@@ -132,7 +132,7 @@ no inherent meaning to Pod::Cats. The parsed entity is provided to
 L</handle_entity>. C<< ZZ<><> >> retains its meaning from POD, which is to be a
 zero-width 'divider' to break up things that would otherwise be considered
 syntax. You are not given C<< ZZ<><> >> to handle, and C<< ZZ<><> >> itself will
-produce undef if it is the only content to an element. A paragraph comprising solely 
+produce undef if it is the only content to an element. A paragraph comprising solely
 C<< ZZ<><> >> will never generate a parsed paragraph; it will be skipped.
 
 =back
@@ -183,7 +183,7 @@ sub parse {
     return $self->parse_lines(split /\n/, $string);
 }
 
-=head2 parse_file 
+=head2 parse_file
 
 Opens the file given by filename and reads it all in and then parses that.
 
@@ -191,7 +191,7 @@ Opens the file given by filename and reads it all in and then parses that.
 
 sub parse_file {
     my ($self, $filename) = @_;
-    
+
     carp "File not found: " . $filename unless -e $filename;
 
     open my $fh, "<", $filename;
@@ -236,11 +236,11 @@ sub parse_lines {
         $line_num++;
 
         for ($line) {
-            when (/^\s*$/) {
+            if (/^\s*$/) {
                 $self->_process_buffer(@buffer);
                 @buffer = ();
             }
-            when (/^([=+-])/) {
+            if (/^([=+-])/) {
                 my $type = $1;
                 if (@buffer) {
                     warn "$type command found without leading blank line on line $line_num\n.";
@@ -259,7 +259,7 @@ sub parse_lines {
                 # bit of buffer contents.
                 push @buffer, grep {$_} ($line =~ /^\Q$type\E(.+?)\b\s*(.*)$/);
             }
-            when (/^\s+\S/) {
+            if (/^\s+\S/) {
                 push @buffer, "verbatim" if !@buffer;
                 push @buffer, $line;
             }
@@ -293,29 +293,29 @@ sub _process_buffer {
     return '' unless @buffer;
 
     my $buffer_type = shift @buffer;
-    
+
     my $node = {
         type => $buffer_type
     };
 
     for ($buffer_type) {
-        when('paragraph') {
+        if($_ eq 'paragraph') {
             # concatenate the lines and normalise whitespace.
             my $para = join " ", @buffer;
             $node->{content} = $para;
         }
-        when('verbatim') {
+        if($_ eq 'verbatim') {
             # find the lowest level of indentation in this buffer and strip it
             my $indent_level = min map { /^(\s+)/; length $1 } @buffer;
             $node->{content} = join "\n", @buffer;
             $node->{indent_level} = $indent_level;
         }
-        when($_ eq 'command' || $_ eq 'begin') {
+        if($_ eq 'command' || $_ eq 'begin') {
             $node->{name} = shift @buffer;
             my $content = join " ", @buffer;
             $node->{content} = $content;
         }
-        when('end') {
+        if($_ eq 'end') {
             $node->{name} = shift @buffer; # end tags take no content
         }
     }
@@ -377,7 +377,7 @@ sub _postprocess_paragraphs {
                 $self->handle_begin($node->{name}, @{ $node->{content} // [] });
             }
             when ('end') {
-                warn "$node->{name} is ended out of sync!" 
+                warn "$node->{name} is ended out of sync!"
                     if pop @{$self->{begin_stack}} ne $node->{name};
 
                 $self->handle_end($node->{name});
@@ -396,7 +396,7 @@ sub _postprocess_paragraphs {
 =head2 handle_verbatim
 
 The verbatim paragraph as it was in the code, except with the minimum amount of
-whitespace stripped from each line as described in L<Verbatim paragraphs|/verbatim>. 
+whitespace stripped from each line as described in L<Verbatim paragraphs|/verbatim>.
 Passed in as a single string with line breaks preserved.
 
 Do whatever you want. Default is to return the string straight back atcha.
@@ -427,7 +427,7 @@ You will never get the C<< ZZ<><> >> entity.
 =cut
 
 sub handle_entity {
-    shift; shift; 
+    shift; shift;
     join ' ', map $_ // '', @_;
 }
 
@@ -456,7 +456,7 @@ return values of L<handle_entity|/handle_entity> as described above. These
 sections are arrayed in @_. Note that the paragraph could start with an entity.
 
 By default it returns @_ concatenated, since the default behaviour of
-L<handle_entity|/handle_entity> is to remove the formatting but keep the 
+L<handle_entity|/handle_entity> is to remove the formatting but keep the
 contents.
 
 =cut
@@ -467,9 +467,9 @@ sub handle_paragraph {
 
 =head2 handle_command
 
-When a L<command|/command> is encountered it comes here. The first argument is 
+When a L<command|/command> is encountered it comes here. The first argument is
 the B<COMMAND> (from B<=COMMAND>); the rest of the arguments follow the rules of
-L<paragraphs|handle_paragraph> and alternate between plain text and parsed 
+L<paragraphs|handle_paragraph> and alternate between plain text and parsed
 entities.
 
 By default it returns @_ concatenated, same as paragraphs.
