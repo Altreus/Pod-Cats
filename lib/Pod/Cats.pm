@@ -229,6 +229,13 @@ sub parse_lines {
     # Adjust for lines we removed.
     $line_num = $line_num - @lines;
 
+    my $original_warn = $SIG{__WARN__} || sub { warn $_[0] };
+    local $SIG{__WARN__} = sub {
+        my $warning = shift;
+        $warning =~ s/at .+/at line $line_num/;
+        $original_warn->($warning);
+    };
+
     for my $line (@lines) {
         $line_num++;
 
