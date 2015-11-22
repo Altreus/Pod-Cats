@@ -1,1 +1,4 @@
 *.swp
+Pod-Cats-*
+META.json
+Makefile.PL
