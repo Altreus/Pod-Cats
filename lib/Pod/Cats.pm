@@ -141,7 +141,7 @@ C<< ZZ<><> >> will never generate a parsed paragraph; it will be skipped.
 
 =cut
 
-our $VERSION = '0.05';
+our $VERSION = '0.07';
 
 =head2 new
 
