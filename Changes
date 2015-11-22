@@ -1,5 +1,10 @@
 Revision history for Podcats-Markup
 
-0.01    Date/time
-        First version, released on an unsuspecting world.
+{{ $NEXT }}
 
+0.07      2015-11-22 14:52:58 GMT
+
+  - Converted to Dist::Zilla
+  - Removed DOM; parser fires events as they happen
+  - Removed given/when
+  - Added warnings about malformed POD
