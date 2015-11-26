@@ -5,7 +5,7 @@ use 5.010;
 
 use parent qw(Parser::MGC);
 
-our $VERSION="0.07";
+our $VERSION = '0.09';
 
 =head1 NAME
 
