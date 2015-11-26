@@ -5,6 +5,42 @@ use 5.010;
 
 use parent qw(Parser::MGC);
 
+our $VERSION="0.07";
+
+=head1 NAME
+
+Pod::Cats::Parser::MGC - Parser for C<< X<elements> >> in L<Pod::Cats>
+
+=head1 DESCRIPTION
+
+Entities in Pod::Cats can be demarcated by any set of delimiters, configured in
+L<Pod::Cats/new>. That configuration ends up here.
+
+Given a string with entities so demarcated, recursively extracts the contents of
+the entities and passes them to the Pod::Cats object for handling.
+
+Thus collates a sequence of (normal string, element, normal string), etc. The
+exact contents of I<element> depends on what your Pod::Cats subclass does with
+the contents of the element; but the contents of I<normal string> is just the
+original text up to the first element.
+
+I<element> may, of course, be another sequence of the above, because it's
+pseudo-recursive (actually it just trundles along iteratively, maintaining a
+nesting level and an expectation of ending delimiters).
+
+=head1 METHODS
+
+=head2 new
+
+Constructs a new parser object. Accepts a hash of C<obj> and C<delimiters>.
+
+C<obj> is required and must contain a Pod::Cats subclass; C<delimiters> defaults
+to C<< "<" >>, like normal POD.
+
+See L<Pod::Cats/new> for delimiters.
+
+=cut
+
 sub new {
     my $self = shift->SUPER::new(@_);
     my %o = @_;
@@ -13,6 +49,13 @@ sub new {
 
     return $self;
 }
+
+=head2 parse
+
+See L<Parser::MGC> for how parse works. This just finds entities based on the
+configured delimiters, and fires events to the object provided to L</new>.
+
+=cut
 
 sub parse {
     my $self = shift;
